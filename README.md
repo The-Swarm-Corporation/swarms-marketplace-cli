@@ -15,30 +15,6 @@ The official command-line interface for the [Swarms Marketplace](https://swarms.
    █▀█▀▀██▀▀█▀█       API https://swarms.world  ·  KEY sk-1234…abcd
    ▀          ▀       ? swarms <command> --help
 ```
-
----
-
-## Table of contents
-
-- [What you can do](#what-you-can-do)
-- [Compatibility](#compatibility)
-- [Installation](#installation)
-- [Quick start](#quick-start)
-- [Authentication](#authentication)
-- [Configuration](#configuration)
-- [Command reference](#command-reference)
-- [Manifest schemas](#manifest-schemas)
-- [Output formats](#output-formats)
-- [Workflows](#workflows)
-- [Security model](#security-model)
-- [Exit codes](#exit-codes)
-- [Performance and limits](#performance-and-limits)
-- [Troubleshooting](#troubleshooting)
-- [Roadmap](#roadmap)
-- [Development](#development)
-- [Versioning and support](#versioning-and-support)
-- [License](#license)
-
 ---
 
 ## What you can do
