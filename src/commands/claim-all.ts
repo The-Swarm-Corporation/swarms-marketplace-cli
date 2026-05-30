@@ -5,31 +5,22 @@ import { getBaseUrl, getWalletPrivateKey } from '../lib/config.js';
 import { promptSecret } from '../lib/prompt.js';
 import { divider, fail, info, ok, theme } from '../lib/theme.js';
 
-interface UserProduct {
-  id: string;
-  name: string;
-  type: 'agent' | 'prompt' | 'tool';
-  tokenized_on?: boolean;
-  token_address?: string | null;
-}
-
-interface UserProductsResponse {
-  user_id: string;
-  username: string;
-  agents: UserProduct[];
-  prompts: UserProduct[];
-  tools: UserProduct[];
-}
-
 interface GlobalTokenizedResponse {
   total: number;
-  products: Array<{
+  counts?: { agents: number; prompts: number };
+  data: Array<{
     id: string;
     name: string;
-    type: 'agent' | 'prompt' | 'tool';
+    type: 'agent' | 'prompt';
     token_address: string;
-    user_id: string | null;
   }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
 }
 
 interface ClaimResponse {
@@ -41,33 +32,8 @@ interface ClaimResponse {
 
 interface Target {
   name: string;
-  type: 'agent' | 'prompt' | 'tool';
+  type: 'agent' | 'prompt';
   token_address: string;
-}
-
-async function fetchUserScopedTargets(
-  username: string | undefined,
-  userId: string | undefined,
-): Promise<Target[]> {
-  const body: Record<string, unknown> = {
-    include_metadata: false,
-    page: 1,
-    limit: 100,
-    product_type: 'all',
-  };
-  if (userId) body.user_id = userId;
-  else if (username) body.username = username;
-  const data = await post<UserProductsResponse>('/api/user-products', body);
-  return [
-    ...(data.agents || []),
-    ...(data.prompts || []),
-    ...(data.tools || []),
-  ]
-    .filter(
-      (p): p is UserProduct & { token_address: string } =>
-        typeof p.token_address === 'string' && p.token_address.length > 0,
-    )
-    .map((p) => ({ name: p.name, type: p.type, token_address: p.token_address }));
 }
 
 async function fetchGlobalTargets(): Promise<Target[]> {
@@ -84,11 +50,12 @@ async function fetchGlobalTargets(): Promise<Target[]> {
         res.status,
       );
     }
-    const data = (await res.json()) as GlobalTokenizedResponse;
-    for (const p of data.products) {
+    const body = (await res.json()) as GlobalTokenizedResponse;
+    const items = body.data ?? [];
+    for (const p of items) {
       out.push({ name: p.name, type: p.type, token_address: p.token_address });
     }
-    if (out.length >= data.total || data.products.length < limit) break;
+    if (out.length >= body.total || items.length < limit) break;
     page++;
     if (page > 20) break; // hard stop at 10,000 mints
   }
@@ -126,33 +93,36 @@ export function registerClaimAll(program: Command): void {
         dryRun?: boolean;
       }) => {
         try {
-          if (!opts.global && !opts.user && !opts.userId) {
-            throw new Error(
-              'Pass --user <username>, --user-id <uuid>, or --global.',
+          // The new /api/user-products contract no longer returns token addresses,
+          // so user-scoped enumeration is not possible from the public API. We
+          // unconditionally walk the global tokenized list; the wallet itself is
+          // the identity used by the claim endpoint, so unowned mints no-op.
+          if (opts.user || opts.userId) {
+            console.log('');
+            console.log(
+              info(
+                '`--user` is informational only — claim-all walks every tokenized mint and the wallet decides what it can collect. Proceeding…',
+              ),
             );
           }
 
           const listSpinner = ora({
-            text: opts.global
-              ? 'Fetching every tokenized product on the marketplace…'
-              : 'Fetching your tokenized products…',
+            text: 'Fetching every tokenized product on the marketplace…',
             color: 'red',
           }).start();
           let targets: Target[];
           try {
-            targets = opts.global
-              ? await fetchGlobalTargets()
-              : await fetchUserScopedTargets(opts.user, opts.userId);
+            targets = await fetchGlobalTargets();
           } finally {
             listSpinner.stop();
           }
 
           if (targets.length === 0) {
             console.log('');
-            console.log(info('No tokenized products found.'));
+            console.log(info('No tokenized products found on the marketplace.'));
             console.log(
               info(
-                'Tip: `swarms tokenized --limit 50` to inspect the global list.',
+                'Tip: `swarms list-tokenized --limit 50` to inspect the catalog.',
               ),
             );
             return;
@@ -161,9 +131,7 @@ export function registerClaimAll(program: Command): void {
           console.log('');
           console.log(
             `  ${theme.chip(' CLAIM ALL ')}  ${theme.text(
-              `${targets.length} mint${targets.length === 1 ? '' : 's'}${
-                opts.global ? ' (global)' : ''
-              }`,
+              `${targets.length} mint${targets.length === 1 ? '' : 's'} (global)`,
             )}`,
           );
           console.log(divider());

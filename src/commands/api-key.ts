@@ -1,37 +1,8 @@
-import { spawn } from 'node:child_process';
 import { Command } from 'commander';
+import { openInBrowser } from '../lib/open.js';
 import { info, label, ok, theme } from '../lib/theme.js';
 
 const API_KEYS_URL = 'https://swarms.world/platform/api-keys';
-
-function openInBrowser(url: string): boolean {
-  const platform = process.platform;
-  let cmd: string;
-  let args: string[];
-  if (platform === 'darwin') {
-    cmd = 'open';
-    args = [url];
-  } else if (platform === 'win32') {
-    cmd = 'cmd';
-    args = ['/c', 'start', '""', url];
-  } else {
-    cmd = 'xdg-open';
-    args = [url];
-  }
-  try {
-    const child = spawn(cmd, args, {
-      stdio: 'ignore',
-      detached: true,
-    });
-    child.on('error', () => {
-      /* swallow; we already printed the URL */
-    });
-    child.unref();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function registerApiKey(program: Command): void {
   program

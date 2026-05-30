@@ -1,6 +1,6 @@
 {
-  "name": "swarms-marketplace-cli",
-  "version": "0.1.0",
+  "name": "swarms-market",
+  "version": "0.1.1",
   "description": "Swarms Marketplace CLI — launch agents, prompts, and tokens, and claim fees from your tokenized products.",
   "keywords": [
     "swarms",
@@ -13,7 +13,8 @@
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "swarms": "./bin/swarms.js"
+    "swarms": "bin/swarms.js",
+    "swarms-market": "bin/swarms.js"
   },
   "files": [
     "bin",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "tsx": "^4.22.3",
     "typescript": "^5.5.0"
   }
 }

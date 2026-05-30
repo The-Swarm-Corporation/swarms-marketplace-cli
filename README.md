@@ -1,8 +1,8 @@
-# swarms-marketplace-cli
+# swarms-market
 
-[![npm version](https://img.shields.io/npm/v/swarms-marketplace-cli.svg)](https://www.npmjs.com/package/swarms-marketplace-cli)
-[![node](https://img.shields.io/node/v/swarms-marketplace-cli.svg)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/swarms-marketplace-cli.svg)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/swarms-market.svg)](https://www.npmjs.com/package/swarms-market)
+[![node](https://img.shields.io/node/v/swarms-market.svg)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/swarms-market.svg)](./LICENSE)
 
 The official command-line interface for the [Swarms Marketplace](https://swarms.world). Publish agents, prompts, and tokens, browse the catalog, and collect creator fees from your tokenized products — entirely from your terminal, with first-class support for scripting, CI/CD, and headless environments.
 
@@ -39,8 +39,9 @@ The official command-line interface for the [Swarms Marketplace](https://swarms.
 | Launch on-chain token for an agent | `swarms launch token`                            | API key + wallet key   |
 | List your published products       | `swarms list`                                    | API key                |
 | Browse every tokenized product     | `swarms list-tokenized` (alias `swarms tokens`)  | None                   |
+| Open a product's listing page      | `swarms open <id\|ca>`                            | None                   |
 | Claim fees on a single mint        | `swarms claim --ca <mint>`                       | Wallet key             |
-| Batch-claim fees                   | `swarms claim-all [--user … \| --global]`        | API key + wallet key   |
+| Batch-claim fees                   | `swarms claim-all`                               | Wallet key             |
 | JSON output for any read command   | `--json` flag                                    | Same as parent command |
 
 ## Compatibility
@@ -57,13 +58,13 @@ The official command-line interface for the [Swarms Marketplace](https://swarms.
 
 ```bash
 # Global install (recommended for daily / shell use)
-npm install -g swarms-marketplace-cli
+npm install -g swarms-market
 
 # Or run without installing (handy for CI)
-npx swarms-marketplace-cli@latest --help
+npx swarms-market@latest --help
 
 # Pin to a specific version in CI
-npm install -g swarms-marketplace-cli@0.1.0
+npm install -g swarms-market@0.1.0
 ```
 
 After install, verify:
@@ -73,10 +74,12 @@ swarms --version
 swarms --help
 ```
 
+> **Heads up:** the package name on npm is `swarms-market`, but the binary it installs is `swarms`. If you already have the Python `swarms` package installed (it ships a binary with the same name), one will shadow the other on your `PATH`. Run `which swarms` to see which one wins; uninstall whichever you don't need, or invoke this one directly via `npx swarms-market <command>`.
+
 ### Uninstall
 
 ```bash
-npm uninstall -g swarms-marketplace-cli
+npm uninstall -g swarms-market
 ```
 
 ## Quick start
@@ -124,7 +127,7 @@ All configuration is environment-driven. The CLI does not read or write any conf
 | Variable                     | Purpose                                                                                       | Default                |
 | ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------- |
 | `SWARMS_API_KEY`             | Bearer token for marketplace endpoints (publish, list, account-scoped reads).                  | _required for auth_    |
-| `SWARMS_USERNAME`            | Default `--user` for `list` / `claim-all`. Lets `swarms list` work with no flags.              | _(pass --user)_        |
+| `SWARMS_USERNAME`            | Default `--user` for `list`. Lets `swarms list` work with no flags.                              | _(pass --user)_        |
 | `SWARMS_API_BASE_URL`        | Override the API host. Use for self-hosted deployments or staging environments.                | `https://swarms.world` |
 | `SWARMS_WALLET_PRIVATE_KEY`  | Wallet private key (base58) for on-chain operations. Held in memory only.                      | _(prompts if unset)_   |
 | `PRIVATE_KEY`                | Alias for `SWARMS_WALLET_PRIVATE_KEY`, for compatibility with common `.env` conventions.       | _(prompts if unset)_   |
@@ -147,6 +150,7 @@ swarms launch token           Tokenize an agent on chain
 swarms list                   Your published products, as a red/white tree
 swarms list-tokenized         Every tokenized product on the marketplace
                               (alias: swarms tokens)
+swarms open <id|ca>           Open a product's listing page in your browser
 
 swarms claim                  Claim fees for one tokenized product (by token mint)
 swarms claim-all              Claim fees across many products
@@ -241,22 +245,22 @@ swarms launch token
 
 ### `list`
 
-Your published products, rendered as a tree grouped by type.
+Your published products, rendered as a tree grouped by type. Calls `POST /api/user-products`.
 
 ```
 swarms list
   [-u, --user <username>]
   [--user-id <id>]
   [--tokenized]
-  [--no-ca]
   [--json]
 ```
 
 - `--user` defaults to `$SWARMS_USERNAME` if unset.
 - `--user-id` accepts a UUID as an alternative to `--user`.
-- `--tokenized` filters to products with a token mint.
-- `--no-ca` hides the truncated token address column.
+- `--tokenized` filters to products whose `business_model === 'tokenized'`.
 - `--json` outputs the raw API payload for piping into other tools.
+
+Each product is returned with `{ id, name, description, type, business_model, listing_url }`, where `business_model` is one of `free`, `paid`, or `tokenized` (tokenized takes precedence over paid).
 
 Example output:
 
@@ -265,13 +269,34 @@ Example output:
 
 ● @kye
 ├─ agents (5)
-│ ├─ My Research Agent  RESCH  TOKEN  $5.00  7xyz…abc123
-│ ├─ Code Reviewer      REVIEW TOKEN  free   3abc…xyz456
-│ └─ Image Captioner    free
+│ ├─ My Research Agent     TOKENIZED
+│ ├─ Code Reviewer         TOKENIZED
+│ └─ Image Captioner       free
 ├─ prompts (4)
-│ └─ …
+│ └─ Concise Summarizer    paid
 └─ tools (3)
-  └─ …
+  └─ JSON Diff             free
+```
+
+`--json` payload shape:
+
+```json
+{
+  "user_id": "uuid",
+  "username": "kye",
+  "total_products": 12,
+  "agents":   [{ "id": "…", "name": "…", "description": "…", "type": "agent",  "business_model": "tokenized", "listing_url": "…" }],
+  "prompts":  [{ "id": "…", "name": "…", "description": "…", "type": "prompt", "business_model": "paid",      "listing_url": "…" }],
+  "tools":    [{ "id": "…", "name": "…", "description": "…", "type": "tool",   "business_model": "free",      "listing_url": "…" }],
+  "summary": {
+    "total_prompts": 4,
+    "total_agents": 5,
+    "total_tools": 3,
+    "free_products": 6,
+    "paid_products": 2,
+    "tokenized_products": 4
+  }
+}
 ```
 
 ### `list-tokenized`
@@ -286,31 +311,65 @@ swarms list-tokenized
   [--json]
 ```
 
-`--json` payload shape (stable, field names mirror the upstream API):
+`--json` payload shape (stable, field names mirror the upstream API). Pagination lives under `pagination`; items live under `data`:
 
 ```json
 {
   "total": 1247,
-  "page": 1,
-  "limit": 100,
-  "total_pages": 13,
   "counts": { "agents": 854, "prompts": 231, "tools": 162 },
-  "products": [
+  "data": [
     {
-      "id": "…",
+      "id": "uuid",
       "name": "Research Agent",
       "type": "agent",
-      "token_address": "7xyz…abc123",
-      "token_symbol": "RESCH",
-      "pool_address": "9pq…",
-      "user_id": "…",
-      "status": "approved",
-      "created_at": "2026-05-30T12:00:00Z",
-      "listing_url": "https://swarms.world/agent/…"
+      "token_address": "5Xy…solana-mint-address",
+      "created_at": "2026-05-30T12:00:00.000Z",
+      "listing_url": "https://swarms.world/agent/uuid"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 100,
+    "total_pages": 13,
+    "has_next": true,
+    "has_prev": false
+  }
 }
 ```
+
+A `400` is returned for an invalid `--type`; the body is `{ "error": "Invalid 'type'. Use one of: all, agent, prompt, tool." }`.
+
+### `open`
+
+Open a product's listing page in your default browser. Public; no API key required.
+
+```
+swarms open <ref>
+  [-t, --type <agent|prompt|tool>]  # required when <ref> is a UUID
+  [--print]                          # print the URL instead of launching
+  [--no-open]                        # alias for --print
+```
+
+`<ref>` is either:
+
+- a **product UUID** (e.g. `162975eb-61f7-4416-ac01-7d87ea67761f`) — must be paired with `--type` so the CLI can construct the URL without a network call. UUIDs alone are ambiguous because the same id can belong to an agent, prompt, or tool.
+- a **token mint / contract address** (base58, 32–44 chars) — resolved against `/api/get-tokenized-products` to find the matching product and its `listing_url`.
+
+```bash
+# Fast path: no network, just build {base}/{type}/{id}
+swarms open --type agent 162975eb-61f7-4416-ac01-7d87ea67761f
+
+# Mint lookup: scans the tokenized catalog, opens the resolved listing
+swarms open 5Xy…solana-mint-address
+
+# Print the URL only (CI, headless, scripting):
+swarms open --type prompt --print 162975eb-61f7-4416-ac01-7d87ea67761f
+```
+
+Exit codes:
+
+- `0` — URL printed and/or browser launched successfully.
+- `1` — `<ref>` not a UUID or base58 mint; UUID given without `--type`; CA resolved to no product; API error.
 
 ### `claim`
 
@@ -348,11 +407,10 @@ swarms claim-all
   [--dry-run]
 ```
 
-| Mode             | Source of mints                                                                                                                                                              |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| User-scoped      | `POST /api/user-products` for the given `--user` / `--user-id` / `$SWARMS_USERNAME`. Only mints owned by that account are attempted.                                          |
-| `--global`       | `GET /api/get-tokenized-products` to enumerate every tokenized mint on the marketplace. Your wallet only collects fees from products it owns; unowned mints no-op silently.   |
+The CLI enumerates every tokenized mint on the marketplace via `GET /api/get-tokenized-products` and attempts a claim against each using your wallet key. The wallet itself is the identity used by the claim endpoint, so any mint you do not own simply no-ops and is reported as `nothing to claim`.
 
+- `--user` / `--user-id` / `$SWARMS_USERNAME` are accepted for forward-compatibility but currently treated as informational. They do not narrow the candidate set because the public `user-products` payload no longer carries token addresses.
+- `--global` is the default behavior; the flag is preserved for explicitness.
 - `--dry-run` prints the list of mints that would be claimed and exits without submitting any transaction.
 - Continue-on-failure: a single mint failing does not abort the batch. The final line reports `N claimed · M nothing-to-claim · K failed · X SOL total`.
 - Exit code is `1` if any individual claim failed, `0` otherwise.
@@ -463,7 +521,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: npm install -g swarms-marketplace-cli@latest
+      - run: npm install -g swarms-market@latest
       - name: Publish
         env:
           SWARMS_API_KEY: ${{ secrets.SWARMS_API_KEY }}
@@ -486,10 +544,8 @@ jobs:
   claim:
     runs-on: ubuntu-latest
     steps:
-      - run: npm install -g swarms-marketplace-cli@latest
+      - run: npm install -g swarms-market@latest
       - env:
-          SWARMS_API_KEY: ${{ secrets.SWARMS_API_KEY }}
-          SWARMS_USERNAME: ${{ vars.SWARMS_USERNAME }}
           PRIVATE_KEY: ${{ secrets.SOLANA_WALLET_KEY }}
         run: swarms claim-all
 ```
@@ -497,7 +553,7 @@ jobs:
 A bare cron entry on Linux:
 
 ```cron
-0 3 * * *  SWARMS_API_KEY=... SWARMS_USERNAME=you PRIVATE_KEY=... swarms claim-all >> /var/log/swarms-claim.log 2>&1
+0 3 * * *  PRIVATE_KEY=... swarms claim-all >> /var/log/swarms-claim.log 2>&1
 ```
 
 ### Bulk publishing a directory of manifests
@@ -552,7 +608,7 @@ The CLI assumes a trustworthy local environment (the user controls their own mac
 ## Performance and limits
 
 - Marketplace endpoints are rate-limited. The CLI does not retry automatically; in batch loops, cap parallelism with `xargs -P` or sleep between iterations.
-- `claim-all --global` makes one network call per tokenized mint on the marketplace. At current volumes that is on the order of seconds per mint; plan accordingly when scheduling.
+- `claim-all` makes one network call per tokenized mint on the marketplace. At current volumes that is on the order of seconds per mint; plan accordingly when scheduling.
 - `list-tokenized` is paged; `--limit 500` is the maximum per page. Mirror the full catalog by walking pages until `has_next` is `false`.
 - `list` returns up to 100 products of each type per call. Larger accounts should use `--user-id` and consume `--json` output.
 - The Node.js process exits as soon as the current command completes; no background work continues after exit.
@@ -566,7 +622,12 @@ You need an API key for every command except `api-key`, `login`, `whoami`, and `
 The API key was rejected. Causes: typo in the env var, key revoked at <https://swarms.world/platform/api-keys>, or the key belongs to a different environment than `$SWARMS_API_BASE_URL`.
 
 **HTTP 429 Too Many Requests**  
-You've hit a rate limit. The CLI does not retry automatically. Back off and retry; for batch jobs (`claim-all --global`, large `bulk launch agent` loops), add a small `sleep` between calls.
+Two distinct causes look the same on the wire:
+
+1. **Real API rate limit.** Detailed error body, possibly with a `Retry-After` header. Back off and retry; for batch jobs (`claim-all`, large `bulk launch agent` loops), add a small `sleep` between calls. The CLI does not retry automatically.
+2. **Vercel "Security Checkpoint" (bot challenge).** The response body is an HTML page whose `<title>` contains `Vercel Security Checkpoint`. This is edge-level bot detection, not a true rate limit. Retrying the same request from the same IP often clears it; for commands that take an explicit identifier (`swarms open --type agent <uuid>`, `swarms claim --ca <mint>`), prefer the fast paths that don't trigger marketplace-wide scans.
+
+The CLI now prints the full request method, URL, status, body snippet, and any rate-limit headers on every HTTP failure — read the body to distinguish the two.
 
 **`Invalid privateKey: could not decode base58 secret key`**  
 The wallet private key must be a base58-encoded secret key (the format Phantom shows in "Export Private Key"). 64-byte JSON arrays and base64 are not accepted by the claim endpoint.
@@ -585,18 +646,24 @@ Set `SWARMS_API_BASE_URL` to the host of your deployment. All commands will rout
 ```bash
 git clone https://github.com/The-Swarm-Corporation/swarms-marketplace-cli
 cd swarms-marketplace-cli
+npm install
+./bin/swarms.js --help
+```
 
-# Scripted (recommended)
+**No rebuild needed in dev.** `bin/swarms.js` detects that `src/index.ts` exists (only true in a working checkout — `src/` is not published) and runs the TypeScript sources directly via [`tsx`](https://github.com/privatenumber/tsx). Edit a file, re-run, see the change. No `npm run build` in the loop.
+
+In published installs `src/` is absent, the detection fails, and the bin shim falls back to `dist/index.js` exactly as before.
+
+```bash
+# Optional helpers
 scripts/dev.sh              # install + type-check + build + smoke-test
 scripts/dev.sh --link       # also `npm link` so `swarms` resolves to this checkout
-scripts/dev.sh --watch      # build in watch mode
+scripts/dev.sh --watch      # build in watch mode (only useful if you want `dist/` updated too)
 scripts/dev.sh --clean      # wipe dist/ and node_modules first
 
-# Manual equivalents
-npm install
-npm run typecheck
-npm run build
-./bin/swarms.js --help
+npm run typecheck           # tsc --noEmit
+npm run build               # tsc → dist/ (required before `npm publish`, not before running)
+./example.sh                # walks through the `swarms open` variants and opens a real tab
 ```
 
 ### Project layout
@@ -605,11 +672,12 @@ npm run build
 src/
   index.ts              commander wiring + custom help renderer
   lib/
-    api.ts              fetch wrapper with Bearer auth + ApiError
+    api.ts              fetch wrapper with Bearer auth + ApiError + structured HTTP error formatter
     config.ts           env-only config (API key, username, base URL, wallet key)
     prompt.ts           readline + hidden-input helpers
     theme.ts            brand colors + animated banner / mascot
     manifest.ts         JSON manifest loader (file path or "-")
+    open.ts             cross-platform openInBrowser() helper
   commands/
     api-key.ts          opens the API keys page
     login.ts            checks SWARMS_API_KEY
@@ -619,13 +687,18 @@ src/
     launch-token.ts     POST /api/token/launch
     list.ts             POST /api/user-products → user products as a tree
     list-tokenized.ts   GET  /api/get-tokenized-products → global flat browser
+    open.ts             open a product's listing page in the browser
     claim.ts            POST /api/product/claimfees (one mint)
-    claim-all.ts        enumerate + claim across user-scoped or global mints
+    claim-all.ts        enumerate every tokenized mint + claim against each
 bin/
-  swarms.js             node entry; checks Node ≥ 18, then loads dist
+  swarms.js             node entry; runs TS via tsx in dev, falls back to dist/ in installed envs
 scripts/
   dev.sh                local development build + smoke test
   publish.sh            version bump + npm publish + git tag
+.github/
+  workflows/
+    npm-publish.yml     CI: patch-bump + npm publish on every push to main (needs NPM_TOKEN secret)
+example.sh              minimal end-to-end demo of `swarms open` (opens a real browser tab)
 ```
 
 ## Versioning and support

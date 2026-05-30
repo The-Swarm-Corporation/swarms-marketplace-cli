@@ -158,7 +158,7 @@ export function section(title: string, sub?: string): string {
 export function footer(): string {
   return [
     '',
-    `  ${theme.dim('?')} ${theme.textMuted('swarms <command> --help')}  ${theme.dim('·')}  ${theme.textMuted('docs')} ${theme.text('swarms.world')}`,
+    `  ${theme.dim('?')} ${theme.textMuted('swarms <command> --help')}  ${theme.dim('·')}  ${theme.textMuted('docs')} ${theme.text('https://docs.swarms.ai/docs/marketplace')}`,
     '',
   ].join('\n');
 }

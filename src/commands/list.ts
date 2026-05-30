@@ -4,17 +4,24 @@ import { ApiError, post } from '../lib/api.js';
 import { getBaseUrl, getUsername } from '../lib/config.js';
 import { fail, info, theme } from '../lib/theme.js';
 
+type BusinessModel = 'free' | 'paid' | 'tokenized';
+
 interface UserProduct {
   id: string;
   name: string;
-  type?: 'agent' | 'prompt' | 'tool';
-  is_free?: boolean;
-  price_usd?: number;
-  tokenized_on?: boolean;
-  token_address?: string | null;
-  ticker?: string | null;
+  description?: string;
+  type: 'agent' | 'prompt' | 'tool';
+  business_model: BusinessModel;
   listing_url?: string;
-  created_at?: string;
+}
+
+interface UserProductsSummary {
+  total_prompts: number;
+  total_agents: number;
+  total_tools: number;
+  free_products: number;
+  paid_products: number;
+  tokenized_products: number;
 }
 
 interface UserProductsResponse {
@@ -24,28 +31,22 @@ interface UserProductsResponse {
   agents: UserProduct[];
   prompts: UserProduct[];
   tools: UserProduct[];
-  summary?: {
-    total_agents: number;
-    total_prompts: number;
-    total_tools: number;
-    free_products: number;
-    paid_products: number;
-  };
+  summary: UserProductsSummary;
 }
 
-function truncCa(ca: string): string {
-  if (ca.length <= 14) return ca;
-  return `${ca.slice(0, 6)}…${ca.slice(-6)}`;
-}
-
-function priceTag(p: UserProduct): string {
-  if (p.is_free) return theme.textMuted('free');
-  if (typeof p.price_usd === 'number') return theme.text(`$${p.price_usd.toFixed(2)}`);
-  return theme.textMuted('paid');
+function badge(p: UserProduct): string {
+  switch (p.business_model) {
+    case 'tokenized':
+      return theme.chip(' TOKENIZED ');
+    case 'paid':
+      return theme.brandSoft('paid');
+    case 'free':
+    default:
+      return theme.textMuted('free');
+  }
 }
 
 interface RenderOpts {
-  showCa: boolean;
   tokenizedOnly: boolean;
 }
 
@@ -59,7 +60,7 @@ function renderBranch(
   const branch = isLast ? '└─' : '├─';
   const cont = isLast ? '  ' : '│ ';
   const filtered = opts.tokenizedOnly
-    ? items.filter((p) => p.tokenized_on || p.token_address)
+    ? items.filter((p) => p.business_model === 'tokenized')
     : items;
 
   out.push(
@@ -78,19 +79,8 @@ function renderBranch(
   filtered.forEach((p, i) => {
     const last = i === filtered.length - 1;
     const tick = last ? '└─' : '├─';
-    const tokenChip = p.token_address
-      ? ` ${theme.chip(' TOKEN ')}`
-      : '';
-    const ticker = p.ticker
-      ? ` ${theme.brandSoft(p.ticker)}`
-      : '';
-    const price = `  ${priceTag(p)}`;
-    const ca = opts.showCa && p.token_address
-      ? `  ${theme.dim(truncCa(p.token_address))}`
-      : '';
-
     out.push(
-      `${theme.brand(cont)} ${theme.brand(tick)} ${theme.text(p.name)}${ticker}${tokenChip}${price}${ca}`,
+      `${theme.brand(cont)} ${theme.brand(tick)} ${theme.text(p.name)}  ${badge(p)}`,
     );
   });
   return out;
@@ -108,15 +98,13 @@ export function registerList(program: Command): void {
       'swarms.world username. Defaults to $SWARMS_USERNAME if set.',
     )
     .option('--user-id <id>', 'User UUID (alternative to --user).')
-    .option('--tokenized', 'Only show tokenized products with a token CA.')
-    .option('--no-ca', 'Hide truncated token addresses next to each item.')
+    .option('--tokenized', 'Only show tokenized products.')
     .option('--json', 'Print the raw API payload instead of the tree view.')
     .action(
       async (opts: {
         user?: string;
         userId?: string;
         tokenized?: boolean;
-        ca: boolean;
         json?: boolean;
       }) => {
         const user = opts.user || getUsername();
@@ -137,7 +125,6 @@ export function registerList(program: Command): void {
         }).start();
         try {
           const body: Record<string, unknown> = {
-            include_metadata: false,
             page: 1,
             limit: 100,
             product_type: 'all',
@@ -161,11 +148,11 @@ export function registerList(program: Command): void {
             prompts: data.summary?.total_prompts ?? data.prompts.length,
             tools: data.summary?.total_tools ?? data.tools.length,
           };
-          const tokenizedCount = [
-            ...data.agents,
-            ...data.prompts,
-            ...data.tools,
-          ].filter((p) => p.tokenized_on || p.token_address).length;
+          const tokenizedCount =
+            data.summary?.tokenized_products ??
+            [...data.agents, ...data.prompts, ...data.tools].filter(
+              (p) => p.business_model === 'tokenized',
+            ).length;
 
           console.log('');
           console.log(
@@ -186,11 +173,10 @@ export function registerList(program: Command): void {
             { label: 'tools', items: data.tools || [] },
           ];
 
-          // Drop empty branches so the tree stays tidy.
           const nonEmpty = branches.filter((b) => {
             if (b.items.length === 0) return false;
             if (!opts.tokenized) return true;
-            return b.items.some((p) => p.tokenized_on || p.token_address);
+            return b.items.some((p) => p.business_model === 'tokenized');
           });
 
           if (nonEmpty.length === 0) {
@@ -210,7 +196,7 @@ export function registerList(program: Command): void {
               b.label,
               b.items,
               i === nonEmpty.length - 1,
-              { showCa: opts.ca !== false, tokenizedOnly: !!opts.tokenized },
+              { tokenizedOnly: !!opts.tokenized },
             );
             for (const line of rendered) console.log(line);
           });
@@ -219,16 +205,15 @@ export function registerList(program: Command): void {
           if (tokenizedCount > 0) {
             console.log(
               `  ${theme.dim('?')} ${theme.textMuted('claim fees with')} ${theme.text(
-                `swarms claim-all --user ${data.username}`,
+                `swarms claim-all --global`,
               )}`,
             );
           }
           console.log(
             `  ${theme.dim('?')} ${theme.textMuted('browse global tokenized products with')} ${theme.text(
-              'swarms tokenized',
+              'swarms tokens',
             )}`,
           );
-          // Use counts for context (suppresses unused warning + adds detail).
           if (counts.agents + counts.prompts + counts.tools !== data.total_products) {
             console.log(
               `  ${theme.dim('?')} ${theme.textMuted(

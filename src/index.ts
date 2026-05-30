@@ -8,6 +8,7 @@ import { registerLaunchPrompt } from './commands/launch-prompt.js';
 import { registerLaunchToken } from './commands/launch-token.js';
 import { registerList } from './commands/list.js';
 import { registerListTokenized } from './commands/list-tokenized.js';
+import { registerOpen } from './commands/open.js';
 import { registerClaim } from './commands/claim.js';
 import { registerClaimAll } from './commands/claim-all.js';
 
@@ -111,6 +112,7 @@ registerLaunchToken(launch);
 
 registerList(program);
 registerListTokenized(program);
+registerOpen(program);
 registerClaim(program);
 registerClaimAll(program);
 
