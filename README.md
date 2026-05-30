@@ -573,6 +573,14 @@ The CLI assumes a trustworthy local environment (the user controls their own mac
 
 `claim-all` returns 1 if any individual claim failed, even if others succeeded; check the summary line at the bottom of the output for per-mint status.
 
+## Performance and limits
+
+- Marketplace endpoints are rate-limited. The CLI does not retry automatically; in batch loops, cap parallelism with `xargs -P` or sleep between iterations.
+- `claim-all --global` makes one network call per tokenized mint on the marketplace. At current volumes that is on the order of seconds per mint; plan accordingly when scheduling.
+- `list-tokenized` is paged; `--limit 500` is the maximum per page. Mirror the full catalog by walking pages until `has_next` is `false`.
+- `list` returns up to 100 products of each type per call. Larger accounts should use `--user-id` and consume `--json` output.
+- The Node.js process exits as soon as the current command completes; no background work continues after exit.
+
 ## Troubleshooting
 
 **`SWARMS_API_KEY is not set`**  
