@@ -1,0 +1,43 @@
+{
+  "name": "swarms-marketplace-cli",
+  "version": "0.1.0",
+  "description": "Swarms Marketplace CLI — launch agents, prompts, and tokens, and claim fees from your tokenized products.",
+  "keywords": [
+    "swarms",
+    "marketplace",
+    "cli",
+    "ai",
+    "agents",
+    "solana"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "swarms": "./bin/swarms.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node bin/swarms.js",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "ora": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
