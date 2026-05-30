@@ -491,19 +491,6 @@ Your npm global bin directory is not on `$PATH`. Run `npm config get prefix` and
 **Self-hosted / staging deployment**  
 Set `SWARMS_API_BASE_URL` to the host of your deployment. All commands will route there instead of `https://swarms.world`.
 
-## Roadmap
-
-Open issues track upcoming commands. Comments and pull requests welcome:
-
-- [#1 `economy`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/1) — marketplace mcap, 24h volume, top tokens
-- [#2 `frenzy`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/2) — frenzy-mode leaderboard
-- [#3 `trending`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/3) — recent trades, with `--watch`
-- [#4 `fees <ca>`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/4) — peek at unclaimed / claimed / lifetime fees without claiming
-- [#5 `earnings`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/5) — aggregate earnings across products + timeline
-- [#6 `init`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/6) — scaffold a manifest in the current directory
-- [#7 `validate`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/7) — dry-run a manifest through the server schema
-- [#8 `open`](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/issues/8) — open a product listing in your browser
-
 ## Development
 
 ```bash
