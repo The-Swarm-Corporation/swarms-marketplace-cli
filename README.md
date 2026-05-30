@@ -310,9 +310,35 @@ swarms list-tokenized
   [--json]
 ```
 
+`--json` payload shape (stable, field names mirror the upstream API):
+
+```json
+{
+  "total": 1247,
+  "page": 1,
+  "limit": 100,
+  "total_pages": 13,
+  "counts": { "agents": 854, "prompts": 231, "tools": 162 },
+  "products": [
+    {
+      "id": "…",
+      "name": "Research Agent",
+      "type": "agent",
+      "token_address": "7xyz…abc123",
+      "token_symbol": "RESCH",
+      "pool_address": "9pq…",
+      "user_id": "…",
+      "status": "approved",
+      "created_at": "2026-05-30T12:00:00Z",
+      "listing_url": "https://swarms.world/agent/…"
+    }
+  ]
+}
+```
+
 ### `claim`
 
-Claim accrued fees for a single tokenized product, identified by its token mint (contract address).
+Claim accrued creator fees for a single tokenized product, identified by its token mint (contract address).
 
 ```
 swarms claim
@@ -320,13 +346,22 @@ swarms claim
   [--private-key <base58>]
 ```
 
-- Submits a fee-claim transaction signed with your wallet key.
+- Submits a fee-claim transaction signed with your wallet key against the marketplace fee endpoint.
 - Prints the transaction signature and the SOL amount claimed.
-- The token-mint address is the public identifier of your tokenized product; no API key is sent for this endpoint (the wallet signature is the authentication).
+- The token mint is the public identifier of the product; no API key is sent for this endpoint (the wallet signature is the authentication).
+
+Example output:
+
+```
+  ✓ Claim submitted.
+  Signature      4xZv…aBc7
+  Claimed        0.214312 SOL
+  Totals         unclaimed=0  claimed=0.214312  lifetime=3.812455
+```
 
 ### `claim-all`
 
-Claim fees across many products in a single command, reusing one wallet key for the batch.
+Claim fees across many products in one command, reusing one wallet key for the batch.
 
 ```
 swarms claim-all
@@ -337,10 +372,25 @@ swarms claim-all
   [--dry-run]
 ```
 
-- **Default mode** (with `--user` or `$SWARMS_USERNAME`): enumerates the user's tokenized products via `POST /api/user-products` and claims each.
-- **`--global` mode**: walks every tokenized mint on the marketplace via `GET /api/get-tokenized-products`. Your wallet only collects fees from products it actually owns; the rest no-op silently.
-- **`--dry-run`** prints the list of mints that would be claimed and exits without submitting any transaction.
-- **Continue-on-failure semantics.** A single mint failing does not abort the batch; a final summary reports `N claimed · M nothing-to-claim · K failed · X SOL total`.
+| Mode             | Source of mints                                                                                                                                                              |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User-scoped      | `POST /api/user-products` for the given `--user` / `--user-id` / `$SWARMS_USERNAME`. Only mints owned by that account are attempted.                                          |
+| `--global`       | `GET /api/get-tokenized-products` to enumerate every tokenized mint on the marketplace. Your wallet only collects fees from products it owns; unowned mints no-op silently.   |
+
+- `--dry-run` prints the list of mints that would be claimed and exits without submitting any transaction.
+- Continue-on-failure: a single mint failing does not abort the batch. The final line reports `N claimed · M nothing-to-claim · K failed · X SOL total`.
+- Exit code is `1` if any individual claim failed, `0` otherwise.
+
+Example tail:
+
+```
+  ✓ Research Agent     7xyz…abc123  +0.214312 SOL  4xZv…aBc7
+  ✓ Code Reviewer      3abc…xyz456  +0.000821 SOL  9pqW…dEf1
+  ✓ Summarizer         9aaa…bbb999  +0.000000 SOL  (nothing to claim)
+  ✗ Image Captioner    7zzz…ccc111  HTTP 429 rate limit
+  ─────────────────────────────────────────────────────
+   DONE   3 claimed · 1 nothing-to-claim · 1 failed · 0.215133 SOL total
+```
 
 ## Manifest schemas
 
@@ -388,6 +438,32 @@ swarms claim-all
   useCases?: [{ title: string, description: string }],
   links?: string[]
 }
+```
+
+## Output formats
+
+| Surface           | Default                                  | Machine-readable                                |
+| ----------------- | ---------------------------------------- | ----------------------------------------------- |
+| `list`            | Tree, grouped by type                    | `--json` → raw `/api/user-products` payload     |
+| `list-tokenized`  | Paged flat list                          | `--json` → `{ total, counts, products, … }`     |
+| `launch *`        | Result summary (`id`, `listing_url`)     | Fields printed line-by-line; parseable          |
+| `claim`           | Summary + signature + SOL claimed        | Always prints structured fields                 |
+| `claim-all`       | Per-mint status + totals                 | Exit code reflects per-mint failures            |
+| `whoami` / `login`| Masked key + base URL                    | Exit code reflects auth presence (`0` / `1`)    |
+| Errors            | Red `✗` + message to stderr              | Use exit codes to detect                        |
+
+All `--json` outputs are stable JSON suitable for `jq` filtering or programmatic consumption. Field names mirror the upstream API. Examples:
+
+```bash
+# Top 5 tokenized agents on the marketplace by recency
+swarms list-tokenized --type agent --limit 5 --json | jq '.products[].name'
+
+# All token CAs you own
+swarms list --json | jq -r '
+  (.agents + .prompts + .tools)[] |
+  select(.token_address) |
+  .token_address
+'
 ```
 
 ## Workflows
