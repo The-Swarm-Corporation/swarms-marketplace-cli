@@ -8,6 +8,8 @@
 
 The official command-line interface for the [Swarms Marketplace](https://swarms.world). Publish agents, prompts, and tokens, browse the catalog, and collect creator fees from your tokenized products — entirely from your terminal, with first-class support for scripting, CI/CD, and headless environments.
 
+> 📖 Full documentation: [docs/DOC.md](./docs/DOC.md)
+>
 > 🌐 Translations: [中文](./docs/README.zh-CN.md) · [日本語](./docs/README.ja.md) · [हिन्दी](./docs/README.hi.md) · [Deutsch](./docs/README.de.md) · [Polski](./docs/README.pl.md) · [Português (BR)](./docs/README.pt-BR.md) · [Français](./docs/README.fr.md)
 
 ---
