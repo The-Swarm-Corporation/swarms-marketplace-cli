@@ -1,13 +1,14 @@
 /**
  * Config is read entirely from environment variables — no file I/O.
  *
- *   SWARMS_API_KEY        Required for endpoints that need Bearer auth
- *                         (launch agent/prompt/token, list).
- *   SWARMS_API_BASE_URL   Optional override of the API host.
- *                         Defaults to https://swarms.world.
+ *   SWARMS_API_KEY      Required for endpoints that need Bearer auth
+ *                       (launch agent/prompt/token, list).
  */
 
-export const DEFAULT_API_BASE = 'https://swarms.world';
+export const API_BASE = 'https://swarms.world';
+
+const ALLOWED_HOSTS = new Set(['swarms.world']);
+const ALLOWED_HOST_SUFFIXES = ['.swarms.world'];
 
 export function getApiKey(): string | undefined {
   const v = process.env.SWARMS_API_KEY;
@@ -23,9 +24,24 @@ export function getUsername(): string | undefined {
   return v && v.trim() ? v.trim() : undefined;
 }
 
+/**
+ * Hardcoded marketplace host. There is no env override — the Bearer API key
+ * and any wallet private key transmitted by the CLI must always go to
+ * swarms.world. If we ever need a staging host, branch on `NODE_ENV` or
+ * publish a separate build rather than reading an env var.
+ */
 export function getBaseUrl(): string {
-  const v = process.env.SWARMS_API_BASE_URL;
-  return (v && v.trim() ? v.trim() : DEFAULT_API_BASE).replace(/\/+$/, '');
+  return API_BASE;
+}
+
+/**
+ * True iff the hostname is on the swarms.world allowlist. Used by the
+ * browser-launcher path so a server-supplied `listing_url` can't redirect
+ * the user to `file://`, a typo-squat domain, or an arbitrary host.
+ */
+export function isAllowedSwarmsHost(hostname: string): boolean {
+  if (ALLOWED_HOSTS.has(hostname)) return true;
+  return ALLOWED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
 }
 
 /**

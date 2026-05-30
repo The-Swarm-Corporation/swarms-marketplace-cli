@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import ora from 'ora';
 import { ApiError, get } from '../lib/api.js';
-import { getBaseUrl } from '../lib/config.js';
+import { getBaseUrl, isAllowedSwarmsHost } from '../lib/config.js';
 import { openInBrowser } from '../lib/open.js';
 import { fail, info, label, ok, theme } from '../lib/theme.js';
 
@@ -129,6 +129,29 @@ export function registerOpen(program: Command): void {
           if (!resolved) {
             console.log('');
             console.log(fail(`No tokenized product found for mint "${ref}".`));
+            process.exitCode = 1;
+            return;
+          }
+          // The listing URL comes from the marketplace API; refuse to follow
+          // it anywhere other than swarms.world so a poisoned listing can't
+          // redirect the user off-site (typo-squat / phishing).
+          let parsedListing: URL | null = null;
+          try {
+            parsedListing = new URL(resolved.listing_url);
+          } catch {
+            /* fall through to the host check below */
+          }
+          if (
+            !parsedListing ||
+            parsedListing.protocol !== 'https:' ||
+            !isAllowedSwarmsHost(parsedListing.hostname)
+          ) {
+            console.log('');
+            console.log(
+              fail(
+                `Refusing to open untrusted listing URL: ${resolved.listing_url}`,
+              ),
+            );
             process.exitCode = 1;
             return;
           }

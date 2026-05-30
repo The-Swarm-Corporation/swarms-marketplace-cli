@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import ora from 'ora';
-import { ApiError, post } from '../lib/api.js';
-import { getBaseUrl, getWalletPrivateKey } from '../lib/config.js';
+import { ApiError, get, post } from '../lib/api.js';
+import { getWalletPrivateKey } from '../lib/config.js';
 import { promptSecret } from '../lib/prompt.js';
 import { divider, fail, info, ok, theme } from '../lib/theme.js';
 
@@ -42,15 +42,9 @@ async function fetchGlobalTargets(): Promise<Target[]> {
   let page = 1;
   const limit = 500;
   while (true) {
-    const url = `/api/get-tokenized-products?type=all&limit=${limit}&page=${page}`;
-    const res = await fetch(`${getBaseUrl()}${url}`);
-    if (!res.ok) {
-      throw new ApiError(
-        `Failed to list tokenized products (${res.status}).`,
-        res.status,
-      );
-    }
-    const body = (await res.json()) as GlobalTokenizedResponse;
+    const body = await get<GlobalTokenizedResponse>(
+      `/api/get-tokenized-products?type=all&limit=${limit}&page=${page}`,
+    );
     const items = body.data ?? [];
     for (const p of items) {
       out.push({ name: p.name, type: p.type, token_address: p.token_address });

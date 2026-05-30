@@ -1,4 +1,6 @@
-# swarms-market
+# Swarms Marketplace CLI
+
+![Swarms CLI Image](img.png)
 
 [![npm version](https://img.shields.io/npm/v/swarms-market.svg)](https://www.npmjs.com/package/swarms-market)
 [![node](https://img.shields.io/node/v/swarms-market.svg)](https://nodejs.org)
@@ -6,18 +8,11 @@
 
 The official command-line interface for the [Swarms Marketplace](https://swarms.world). Publish agents, prompts, and tokens, browse the catalog, and collect creator fees from your tokenized products — entirely from your terminal, with first-class support for scripting, CI/CD, and headless environments.
 
-```
-  ▎ Tip: Get an API key with swarms api-key, then export SWARMS_API_KEY="…"
+> 🌐 Translations: [中文](./docs/README.zh-CN.md) · [日本語](./docs/README.ja.md) · [हिन्दी](./docs/README.hi.md) · [Deutsch](./docs/README.de.md) · [Polski](./docs/README.pl.md) · [Português (BR)](./docs/README.pt-BR.md) · [Français](./docs/README.fr.md)
 
-     ▄▄    ▄▄
-    ██████████        Swarms Marketplace  v0.1.0
-   ██▀██▄▄██▀██       Launch agents, prompts, tokens. Claim fees.
-   █▀█▀▀██▀▀█▀█       API https://swarms.world  ·  KEY sk-1234…abcd
-   ▀          ▀       ? swarms <command> --help
-```
 ---
 
-## What you can do
+## Overview
 
 `swarms` is a fully scriptable client over the Swarms Marketplace HTTP API. It maps directly onto the operations that drive a marketplace business:
 
@@ -128,7 +123,6 @@ All configuration is environment-driven. The CLI does not read or write any conf
 | ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------- |
 | `SWARMS_API_KEY`             | Bearer token for marketplace endpoints (publish, list, account-scoped reads).                  | _required for auth_    |
 | `SWARMS_USERNAME`            | Default `--user` for `list`. Lets `swarms list` work with no flags.                              | _(pass --user)_        |
-| `SWARMS_API_BASE_URL`        | Override the API host. Use for self-hosted deployments or staging environments.                | `https://swarms.world` |
 | `SWARMS_WALLET_PRIVATE_KEY`  | Wallet private key (base58) for on-chain operations. Held in memory only.                      | _(prompts if unset)_   |
 | `PRIVATE_KEY`                | Alias for `SWARMS_WALLET_PRIVATE_KEY`, for compatibility with common `.env` conventions.       | _(prompts if unset)_   |
 | `SWARMS_NO_ANIM`             | Set to any value to disable the welcome animation, even in an interactive terminal.            | _(animate if TTY)_     |
@@ -584,7 +578,7 @@ The wallet private key required by `claim`, `claim-all`, and `launch token` is s
 For shell-history hygiene: prefer the env-var or interactive-prompt paths over `--private-key`, since process arguments may be visible to other users via `ps` on some systems and end up in shell history files.
 
 **Transport.**  
-All requests use HTTPS to your configured `SWARMS_API_BASE_URL` (default `https://swarms.world`). The CLI does not disable TLS verification under any flag.
+All requests use HTTPS to `https://swarms.world`. The host is hardcoded — there is no env override — so a stray shell variable cannot redirect the Bearer key or wallet private key to another host. The CLI does not disable TLS verification under any flag.
 
 **Logging.**  
 Successful operations print summary information (transaction signature, IDs, masked key prefixes) to stdout. Errors print to stderr. The wallet private key is never included in any log line. Network errors include the URL that was contacted and the HTTP status code.
@@ -619,7 +613,7 @@ The CLI assumes a trustworthy local environment (the user controls their own mac
 You need an API key for every command except `api-key`, `login`, `whoami`, and `list-tokenized`. Run `swarms api-key` to grab one, then `export SWARMS_API_KEY="…"`.
 
 **HTTP 401 Unauthorized**  
-The API key was rejected. Causes: typo in the env var, key revoked at <https://swarms.world/platform/api-keys>, or the key belongs to a different environment than `$SWARMS_API_BASE_URL`.
+The API key was rejected. Causes: typo in the env var, or the key was revoked at <https://swarms.world/platform/api-keys>.
 
 **HTTP 429 Too Many Requests**  
 Two distinct causes look the same on the wire:
@@ -637,9 +631,6 @@ Animation auto-disables when stdout is not a TTY, `$CI` is set, or `$TERM=dumb`.
 
 **`Command not found: swarms` after install**  
 Your npm global bin directory is not on `$PATH`. Run `npm config get prefix` and add `<prefix>/bin` to your shell's `PATH`.
-
-**Self-hosted / staging deployment**  
-Set `SWARMS_API_BASE_URL` to the host of your deployment. All commands will route there instead of `https://swarms.world`.
 
 ## Development
 

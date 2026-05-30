@@ -35,7 +35,6 @@ const TIPS: string[] = [
   `Set ${theme.bold('$PRIVATE_KEY')} to skip the wallet prompt on ${theme.bold('claim')} / ${theme.bold('launch token')}`,
   `${theme.bold('swarms tree')} renders every tokenized product as a red/white tree`,
   `Pipe a manifest via stdin: ${theme.bold('cat agent.json | swarms launch agent -m -')}`,
-  `Override the host with ${theme.bold('SWARMS_API_BASE_URL')} (default ${theme.bold('https://swarms.world')})`,
   `Inspect your account quickly with ${theme.bold('swarms whoami')}`,
 ];
 
