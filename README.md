@@ -16,25 +16,56 @@ The official command-line interface for the [Swarms Marketplace](https://swarms.
    ▀          ▀       ? swarms <command> --help
 ```
 
+---
+
+## Table of contents
+
+- [What you can do](#what-you-can-do)
+- [Compatibility](#compatibility)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Authentication](#authentication)
+- [Configuration](#configuration)
+- [Command reference](#command-reference)
+- [Manifest schemas](#manifest-schemas)
+- [Output formats](#output-formats)
+- [Workflows](#workflows)
+- [Security model](#security-model)
+- [Exit codes](#exit-codes)
+- [Performance and limits](#performance-and-limits)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [Development](#development)
+- [Versioning and support](#versioning-and-support)
+- [License](#license)
 
 ---
 
-## Overview
+## What you can do
 
-`swarms` is a thin, fully scriptable client over the Swarms Marketplace HTTP API. It exists for the workflows that the web app doesn't optimize for:
+`swarms` is a fully scriptable client over the Swarms Marketplace HTTP API. It maps directly onto the operations that drive a marketplace business:
 
-- **Programmatic publishing** of agents and prompts from CI pipelines, monorepos, or batch scripts.
-- **Operations on tokenized products** — launching tokens, claiming creator fees across one or many mints, browsing the catalog — without leaving the terminal or context-switching to a browser wallet flow.
-- **Reproducible automation** — every action is expressible as a single command with flags, suitable for cron, GitHub Actions, or any pipeline runner.
-- **Discovery and inspection** of what's listed on the marketplace, with structured output (JSON) for piping into downstream tooling.
+- **Publish products at scale.** Push agents, prompts, and tools to the marketplace from a single command, a JSON manifest, or a directory of manifests in CI. No browser, no manual form.
+- **Launch on-chain tokens.** Tokenize an agent in one call, including ticker, quote currency, image, and fee mode. The launch transaction is signed with a wallet key supplied at runtime.
+- **Collect creator fees, alone or in bulk.** Claim fees on a single token, on every token you own, or sweep every tokenized mint on the marketplace in one batch with continue-on-failure semantics.
+- **Audit your catalog.** Render your published products as a structured tree, filter for tokenized-only, and emit JSON for downstream dashboards.
+- **Discover the marketplace.** Page through every tokenized product (no API key required) as a flat list or as JSON, suitable for indexing, mirroring, or analytics.
+- **Automate everything.** Every command is non-interactive when the right environment variables are set, returns standard exit codes, and disables animations / prompts when running outside a TTY or under `$CI`.
 
-Design principles:
+### Capabilities at a glance
 
-- **Environment-driven configuration.** All credentials and defaults come from environment variables; the CLI never writes secrets to disk.
-- **Wallet keys are ephemeral.** The wallet private key required for on-chain operations is held in process memory only, for the duration of one command.
-- **Pipe-friendly output.** Every command supports `--json` (or pipe-safe text) so output can be parsed by downstream tools.
-- **Deterministic in CI.** Animations and prompts disable automatically when stdout is not a TTY or `$CI` is set.
-- **Three-color UI.** Brand red, white, dim gray. No emoji clutter, no color theming surprises.
+| Capability                         | Command                                          | Auth required          |
+| ---------------------------------- | ------------------------------------------------ | ---------------------- |
+| Open API keys page                 | `swarms api-key`                                 | None                   |
+| Verify environment auth            | `swarms login` · `swarms whoami`                 | API key                |
+| Publish an agent                   | `swarms launch agent`                            | API key                |
+| Publish a prompt                   | `swarms launch prompt`                           | API key                |
+| Launch on-chain token for an agent | `swarms launch token`                            | API key + wallet key   |
+| List your published products       | `swarms list`                                    | API key                |
+| Browse every tokenized product     | `swarms list-tokenized` (alias `swarms tokens`)  | None                   |
+| Claim fees on a single mint        | `swarms claim --ca <mint>`                       | Wallet key             |
+| Batch-claim fees                   | `swarms claim-all [--user … \| --global]`        | API key + wallet key   |
+| JSON output for any read command   | `--json` flag                                    | Same as parent command |
 
 ## Compatibility
 
@@ -100,8 +131,6 @@ swarms list-tokenized
 ```
 
 ## Authentication
-
-`swarms` authenticates by sending your API key as a `Bearer` token in the `Authorization` header on every request. There is **no `login` flow that asks for credentials and no on-disk session file** — the environment variable is the single source of truth.
 
 Obtain a key at <https://swarms.world/platform/api-keys> (or run `swarms api-key`). Keys can be created, named, and revoked from that page.
 
@@ -539,12 +568,6 @@ scripts/
   publish.sh            version bump + npm publish + git tag
 ```
 
-### Banner internals
-
-- `theme.ts` exports `banner()` (static, used in `--help`) and `animatedBanner()` (TTY-only, used on the no-args welcome path). The mascot is a 5-row half-block ASCII space invader with two frames; `animatedBanner()` cycles through them six times at 170 ms each using `\x1b[<n>A` cursor moves and restores the cursor on exit / SIGINT.
-- A custom `SwarmsHelp` class is attached recursively to every sub-command at startup so `swarms`, `swarms launch`, `swarms list-tokenized`, etc. all share the same `▎ Section` headers, indentation, and color treatment.
-- Three colors: brand red (`#FF2D2D`), white (`#F5F5F5`), dim gray (`#5A5A5A`). Avoid introducing blues / greens / yellows in new output.
-
 ## Versioning and support
 
 This project follows [Semantic Versioning](https://semver.org). Breaking changes are reserved for major releases; new commands and flags ship in minor releases; bug fixes in patch releases. Changelog entries live in [GitHub Releases](https://github.com/The-Swarm-Corporation/swarms-marketplace-cli/releases).
@@ -566,4 +589,4 @@ The publish script enforces a clean tree, `main` branch, and a successful `npm w
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+Apache License 2.0. See [LICENSE](./LICENSE).
