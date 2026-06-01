@@ -56,6 +56,9 @@ npm run typecheck
 step "Building (tsc -> dist/)"
 npm run build
 
+step "Running tests"
+npm test
+
 step "Smoke test"
 node bin/swarms.js --version
 node bin/swarms.js --help >/dev/null
