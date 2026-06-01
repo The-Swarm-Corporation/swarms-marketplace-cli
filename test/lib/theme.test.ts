@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { MASCOT_HEIGHT, banner } from './theme.js';
+import { MASCOT_HEIGHT, banner } from '../../src/lib/theme.js';
 
 describe('theme', () => {
   const originalEnv = process.env;

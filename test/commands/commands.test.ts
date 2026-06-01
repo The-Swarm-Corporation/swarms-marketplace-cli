@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Command } from 'commander';
-import { registerApiKey } from './api-key.js';
-import { registerLogin } from './login.js';
-import { registerWhoami } from './whoami.js';
-import { registerLaunchAgent } from './launch-agent.js';
-import { registerLaunchPrompt } from './launch-prompt.js';
-import { registerLaunchToken } from './launch-token.js';
-import { registerList } from './list.js';
-import { registerListTokenized } from './list-tokenized.js';
-import { registerOpen } from './open.js';
-import { registerClaim } from './claim.js';
-import { registerClaimAll } from './claim-all.js';
+import { registerApiKey } from '../../src/commands/api-key.js';
+import { registerLogin } from '../../src/commands/login.js';
+import { registerWhoami } from '../../src/commands/whoami.js';
+import { registerLaunchAgent } from '../../src/commands/launch-agent.js';
+import { registerLaunchPrompt } from '../../src/commands/launch-prompt.js';
+import { registerLaunchToken } from '../../src/commands/launch-token.js';
+import { registerList } from '../../src/commands/list.js';
+import { registerListTokenized } from '../../src/commands/list-tokenized.js';
+import { registerOpen } from '../../src/commands/open.js';
+import { registerClaim } from '../../src/commands/claim.js';
+import { registerClaimAll } from '../../src/commands/claim-all.js';
 
 describe('Commands', () => {
   const originalEnv = process.env;

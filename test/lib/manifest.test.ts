@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loadManifest } from './manifest.js';
+import { loadManifest } from '../../src/lib/manifest.js';
 import fs from 'node:fs';
 
 vi.mock('node:fs');

@@ -8,7 +8,7 @@ vi.mock('node:child_process', () => ({
   })),
 }));
 
-import { openInBrowser } from './open.js';
+import { openInBrowser } from '../../src/lib/open.js';
 
 describe('openInBrowser', () => {
 

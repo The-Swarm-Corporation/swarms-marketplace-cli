@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { formatHttpError, ApiError, get, post } from './api.js';
+import { formatHttpError, ApiError, get, post } from '../../src/lib/api.js';
 
 describe('formatHttpError', () => {
   it('should prefer parsed body message over raw body', () => {

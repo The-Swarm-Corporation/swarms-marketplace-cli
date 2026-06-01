@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getApiKey, getUsername, getBaseUrl, getWalletPrivateKey, isAllowedSwarmsHost } from './config.js';
+import { getApiKey, getUsername, getBaseUrl, getWalletPrivateKey, isAllowedSwarmsHost } from '../../src/lib/config.js';
 
 describe('config', () => {
   const originalEnv = process.env;
