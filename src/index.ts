@@ -12,6 +12,8 @@ import { registerOpen } from './commands/open.js';
 import { registerClaim } from './commands/claim.js';
 import { registerClaimAll } from './commands/claim-all.js';
 import { registerUpgrade } from './commands/upgrade.js';
+import { registerFees } from './commands/fees.js';
+
 
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -117,6 +119,7 @@ registerOpen(program);
 registerClaim(program);
 registerClaimAll(program);
 registerUpgrade(program);
+registerFees(program);
 
 attachHelp(program);
 
