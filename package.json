@@ -1,6 +1,6 @@
 {
   "name": "swarms-market",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Swarms Marketplace CLI — launch agents, prompts, and tokens, and claim fees from your tokenized products.",
   "keywords": [
     "swarms",
