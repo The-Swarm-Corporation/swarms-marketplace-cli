@@ -31,6 +31,7 @@ The official command-line interface for the [Swarms Marketplace](https://swarms.
 | ---------------------------------- | ------------------------------------------------ | ---------------------- |
 | Open API keys page                 | `swarms api-key`                                 | None                   |
 | Verify environment auth            | `swarms login` · `swarms whoami`                 | API key                |
+| Validate a manifest                | `swarms validate <path>`                         | API key                |
 | Publish an agent                   | `swarms launch agent`                            | API key                |
 | Publish a prompt                   | `swarms launch prompt`                           | API key                |
 | Launch on-chain token for an agent | `swarms launch token`                            | API key + wallet key   |
@@ -137,6 +138,8 @@ swarms api-key                Open the API keys page in your browser
 swarms login                  Verify SWARMS_API_KEY is set
 swarms whoami                 Show the active key (masked) and base URL
 
+swarms validate <path>        Validate a manifest against the server schema
+
 swarms launch agent           Publish an agent
 swarms launch prompt          Publish a prompt
 swarms launch token           Tokenize an agent on chain
@@ -175,6 +178,62 @@ swarms whoami
 ```
 
 Shorter form of `login`. Prints the active API key (masked) and the base URL.
+
+### `validate`
+
+Validates a manifest against the server's Zod schema **without** submitting it or consuming your daily rate limit. Catches schema errors locally before they burn an API call.
+
+```
+swarms validate [path]
+  [--type <agent|prompt|tool>]
+```
+
+- `[path]` — Path to a JSON manifest file. Use `-` to read from stdin. Defaults to `-` if omitted.
+- `--type` — Manifest type: `agent`, `prompt`, or `tool`. Auto-inferred from the filename if the path contains "agent", "prompt", or "tool". **Required** when reading from stdin or when the filename is ambiguous.
+
+The command calls server-side validation endpoints (`POST /api/validate-agent`, `/api/validate-prompt`, `/api/validate-tool`) that reuse the same Zod schemas as the actual submission endpoints but **do not** write to the database or count against rate limits.
+
+**Exit codes:**
+- `0` — Manifest is valid
+- `1` — Manifest is invalid, or validation endpoint not available, or other error
+
+**Output:**
+
+Valid manifest:
+```
+  ✓ Valid manifest
+```
+
+Invalid manifest with schema errors:
+```
+  ✗ Invalid manifest
+
+  1. name
+     String must contain at least 2 character(s)
+  2. description
+     Required
+  3. tags
+     Expected string, received number
+```
+
+**Examples:**
+
+```bash
+# Validate an agent manifest (type inferred from filename)
+swarms validate ./my-agent.json
+
+# Validate from stdin with explicit type
+cat prompt.json | swarms validate --type prompt
+
+# Validate a tool manifest
+swarms validate ./tools/my-tool.json --type tool
+
+# Use in a pre-publish CI check
+swarms validate agent-manifest.json && swarms launch agent -m agent-manifest.json
+```
+
+**Server implementation note:**  
+The validation endpoints must be implemented on the server side. If the endpoint returns 404, the CLI will report that validation is not yet available for that manifest type. This keeps the CLI and server schemas in sync — no drift risk.
 
 ### `launch agent`
 
@@ -666,6 +725,7 @@ src/
     api-key.ts          opens the API keys page
     login.ts            checks SWARMS_API_KEY
     whoami.ts           prints masked key + base
+    validate.ts         POST /api/validate-{agent|prompt|tool} → dry-run schema validation
     launch-agent.ts     POST /api/add-agent
     launch-prompt.ts    POST /api/add-prompt
     launch-token.ts     POST /api/token/launch
