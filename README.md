@@ -118,7 +118,7 @@ Only `api-key` (which just opens the keys page in your browser) is callable with
 
 ## Configuration
 
-All configuration is environment-driven. The CLI does not read or write any config file.
+All configuration is environment-driven. The CLI does not read or write any config file — it does **not** auto-load `.env` either. [`.env.example`](./.env.example) documents every variable; copy it to `.env` (gitignored) and source it yourself (`set -a && source .env && set +a`, or use direnv).
 
 | Variable                     | Purpose                                                                                       | Default                |
 | ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------- |
