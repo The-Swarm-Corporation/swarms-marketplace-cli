@@ -12,6 +12,7 @@ import { registerOpen } from './commands/open.js';
 import { registerClaim } from './commands/claim.js';
 import { registerClaimAll } from './commands/claim-all.js';
 import { registerUpgrade } from './commands/upgrade.js';
+import { registerInit } from './commands/init.js';
 
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -103,6 +104,7 @@ function attachHelp(cmd: Command): void {
 registerApiKey(program);
 registerLogin(program);
 registerWhoami(program);
+registerInit(program);
 
 const launch = program
   .command('launch')
