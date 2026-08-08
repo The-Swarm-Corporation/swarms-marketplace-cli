@@ -16,15 +16,6 @@ export function getApiKey(): string | undefined {
 }
 
 /**
- * Optional default username for commands that take --user (notably `list`).
- * Lets `swarms list` work with no flags in the common case.
- */
-export function getUsername(): string | undefined {
-  const v = process.env.SWARMS_USERNAME;
-  return v && v.trim() ? v.trim() : undefined;
-}
-
-/**
  * Hardcoded marketplace host. There is no env override — the Bearer API key
  * and any wallet private key transmitted by the CLI must always go to
  * swarms.world. If we ever need a staging host, branch on `NODE_ENV` or
