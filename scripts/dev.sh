@@ -3,7 +3,7 @@
 #
 # Usage:
 #   scripts/dev.sh               # install deps, type-check, build, smoke-test
-#   scripts/dev.sh --link        # additionally `npm link` so `swarms` resolves locally
+#   scripts/dev.sh --link        # additionally `pnpm link --global` so `swarms` resolves locally
 #   scripts/dev.sh --watch       # build in watch mode after the initial install
 #   scripts/dev.sh --clean       # rm -rf dist + node_modules before building
 #
@@ -35,7 +35,7 @@ for arg in "$@"; do
 done
 
 command -v node >/dev/null 2>&1 || fail "node is not installed"
-command -v npm  >/dev/null 2>&1 || fail "npm is not installed"
+command -v pnpm >/dev/null 2>&1 || fail "pnpm is not installed (https://pnpm.io/installation)"
 
 NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
 if [ "$NODE_MAJOR" -lt 18 ]; then
@@ -48,13 +48,16 @@ if [ "$CLEAN" = "1" ]; then
 fi
 
 step "Installing dependencies"
-npm install --no-audit --no-fund
+pnpm install
 
 step "Type-checking"
-npm run typecheck
+pnpm run typecheck
+
+step "Running tests"
+pnpm test
 
 step "Building (tsc -> dist/)"
-npm run build
+pnpm run build
 
 step "Running tests"
 npm test
@@ -66,13 +69,13 @@ note "Help text rendered without error."
 
 if [ "$LINK" = "1" ]; then
   step "Linking globally so 'swarms' resolves to this checkout"
-  npm link
-  note "Run 'npm unlink -g swarms-marketplace-cli' to undo."
+  pnpm link --global
+  note "Run 'pnpm unlink --global' in this directory to undo."
 fi
 
 if [ "$WATCH" = "1" ]; then
   step "Entering watch mode (Ctrl-C to exit)"
-  exec npm run dev
+  exec pnpm run dev
 fi
 
 step "Done. Try:  node bin/swarms.js --help"

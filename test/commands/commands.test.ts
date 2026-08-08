@@ -251,21 +251,20 @@ describe('Commands', () => {
   });
 
   describe('list', () => {
-    it('should require --user or --user-id or $SWARMS_USERNAME', async () => {
-      delete process.env.SWARMS_USERNAME;
+    it('should require an API key', async () => {
+      delete process.env.SWARMS_API_KEY;
       const program = new Command();
       registerList(program);
-      
+
       await program.parseAsync(['node', 'test', 'list']);
-      
+
       expect(process.exitCode).toBe(1);
       const output = consoleOutput.join('\n');
-      expect(output).toContain('--user');
+      expect(output).toContain('SWARMS_API_KEY');
     });
 
-    it('should use $SWARMS_USERNAME when set', async () => {
+    it('should work with no identity flags (server resolves the caller from the key)', async () => {
       process.env.SWARMS_API_KEY = 'test-key';
-      process.env.SWARMS_USERNAME = 'testuser';
       (global.fetch as any).mockResolvedValue(
         new Response(JSON.stringify({
           username: 'testuser',
@@ -276,12 +275,12 @@ describe('Commands', () => {
           summary: { total_agents: 0, total_prompts: 0, total_tools: 0, tokenized_products: 0 }
         }), { status: 200 })
       );
-      
+
       const program = new Command();
       registerList(program);
-      
+
       await program.parseAsync(['node', 'test', 'list']);
-      
+
       expect(process.exitCode).toBe(0);
     });
 
@@ -301,7 +300,7 @@ describe('Commands', () => {
       const program = new Command();
       registerList(program);
       
-      await program.parseAsync(['node', 'test', 'list', '--user', 'test', '--json']);
+      await program.parseAsync(['node', 'test', 'list', '--json']);
       
       const output = consoleOutput.join('\n');
       expect(output).toContain('"username"');
@@ -326,7 +325,7 @@ describe('Commands', () => {
       const program = new Command();
       registerList(program);
       
-      await program.parseAsync(['node', 'test', 'list', '--user', 'test', '--tokenized']);
+      await program.parseAsync(['node', 'test', 'list', '--tokenized']);
       
       expect(process.exitCode).toBe(0);
     });
@@ -334,6 +333,7 @@ describe('Commands', () => {
 
   describe('list-tokenized', () => {
     it('should validate --type parameter', async () => {
+      process.env.SWARMS_API_KEY = 'test-key';
       (global.fetch as any).mockResolvedValue(
         new Response(JSON.stringify({
           total: 0,
@@ -352,6 +352,7 @@ describe('Commands', () => {
     });
 
     it('should support pagination', async () => {
+      process.env.SWARMS_API_KEY = 'test-key';
       (global.fetch as any).mockResolvedValue(
         new Response(JSON.stringify({
           total: 200,
@@ -508,6 +509,7 @@ describe('Commands', () => {
 
   describe('claim-all', () => {
     it('should support --dry-run', async () => {
+      process.env.SWARMS_API_KEY = 'test-key';
       (global.fetch as any).mockResolvedValue(
         new Response(JSON.stringify({
           total: 2,
@@ -531,6 +533,7 @@ describe('Commands', () => {
     });
 
     it('should continue on failure', async () => {
+      process.env.SWARMS_API_KEY = 'test-key';
       let callCount = 0;
       (global.fetch as any).mockImplementation(() => {
         callCount++;

@@ -118,7 +118,7 @@ Only `api-key` (which just opens the keys page in your browser) is callable with
 
 ## Configuration
 
-All configuration is environment-driven. The CLI does not read or write any config file.
+All configuration is environment-driven. The CLI does not read or write any config file — it does **not** auto-load `.env` either. [`.env.example`](./.env.example) documents every variable; copy it to `.env` (gitignored) and source it yourself (`set -a && source .env && set +a`, or use direnv).
 
 | Variable                     | Purpose                                                                                       | Default                |
 | ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------- |
@@ -630,24 +630,24 @@ Your npm global bin directory is not on `$PATH`. Run `npm config get prefix` and
 ```bash
 git clone https://github.com/The-Swarm-Corporation/swarms-marketplace-cli
 cd swarms-marketplace-cli
-npm install
+pnpm install
 ./bin/swarms.js --help
 ```
 
-**No rebuild needed in dev.** `bin/swarms.js` detects that `src/index.ts` exists (only true in a working checkout — `src/` is not published) and runs the TypeScript sources directly via [`tsx`](https://github.com/privatenumber/tsx). Edit a file, re-run, see the change. No `npm run build` in the loop.
+**No rebuild needed in dev.** `bin/swarms.js` detects that `src/index.ts` exists (only true in a working checkout — `src/` is not published) and runs the TypeScript sources directly via [`tsx`](https://github.com/privatenumber/tsx). Edit a file, re-run, see the change. No `pnpm run build` in the loop.
 
 In published installs `src/` is absent, the detection fails, and the bin shim falls back to `dist/index.js` exactly as before.
 
 ```bash
 # Optional helpers
-scripts/dev.sh              # install + type-check + build + smoke-test
-scripts/dev.sh --link       # also `npm link` so `swarms` resolves to this checkout
+scripts/dev.sh              # install + type-check + test + build + smoke-test
+scripts/dev.sh --link       # also `pnpm link --global` so `swarms` resolves to this checkout
 scripts/dev.sh --watch      # build in watch mode (only useful if you want `dist/` updated too)
 scripts/dev.sh --clean      # wipe dist/ and node_modules first
 
-npm run typecheck           # tsc --noEmit
-npm run build               # tsc → dist/ (required before `npm publish`, not before running)
-./example.sh                # walks through the `swarms open` variants and opens a real tab
+pnpm run typecheck          # tsc --noEmit
+pnpm test                   # both suites: node:test (tests/) + vitest (test/); network is always mocked
+pnpm run build              # tsc → dist/ (required before `pnpm publish`, not before running)
 ```
 
 ### Project layout
@@ -677,12 +677,10 @@ src/
 bin/
   swarms.js             node entry; runs TS via tsx in dev, falls back to dist/ in installed envs
 scripts/
-  dev.sh                local development build + smoke test
-  publish.sh            version bump + npm publish + git tag
-.github/
-  workflows/
-    npm-publish.yml     CI: patch-bump + npm publish on every push to main (needs NPM_TOKEN secret)
-example.sh              minimal end-to-end demo of `swarms open` (opens a real browser tab)
+  dev.sh                local development install + typecheck + tests + build + smoke test
+  install.sh            curl-able installer (checks Node/npm, installs swarms-market globally)
+tests/
+  *.test.ts             node:test suites for every core command and lib (run with `pnpm test`)
 ```
 
 ## Versioning and support
