@@ -16,28 +16,28 @@ Be respectful, be specific, be patient. Feedback is on the code, not the contrib
 
 ## Development setup
 
-You need Node.js ≥ 18 and one of `npm`, `pnpm`, `yarn`, or `bun` (`npm` is what CI uses).
+You need Node.js ≥ 18 and [`pnpm`](https://pnpm.io) (the repo pins it via the `packageManager` field).
 
 ```bash
 git clone https://github.com/The-Swarm-Corporation/swarms-marketplace-cli
 cd swarms-marketplace-cli
-npm install
+pnpm install
 ./bin/swarms.js --help
 ```
 
-**No rebuild needed in dev.** `bin/swarms.js` detects that `src/index.ts` exists (only true in a working checkout) and runs the TypeScript sources directly via [`tsx`](https://github.com/privatenumber/tsx). Edit a file, re-run, see the change. No `npm run build` in the inner loop.
+**No rebuild needed in dev.** `bin/swarms.js` detects that `src/index.ts` exists (only true in a working checkout) and runs the TypeScript sources directly via [`tsx`](https://github.com/privatenumber/tsx). Edit a file, re-run, see the change. No `pnpm run build` in the inner loop.
 
 Optional helpers:
 
 ```bash
-scripts/dev.sh              # install + type-check + build + smoke-test
-scripts/dev.sh --link       # also `npm link` so `swarms` resolves to this checkout
+scripts/dev.sh              # install + type-check + test + build + smoke-test
+scripts/dev.sh --link       # also `pnpm link --global` so `swarms` resolves to this checkout
 scripts/dev.sh --watch      # build in watch mode
 scripts/dev.sh --clean      # wipe dist/ and node_modules first
 
-npm run typecheck           # tsc --noEmit
-npm run build               # tsc → dist/ (required before `npm publish`, not before running)
-./example.sh                # walks through `swarms open` variants and opens a real tab
+pnpm run typecheck          # tsc --noEmit
+pnpm test                   # node:test suites in tests/ (all network calls mocked)
+pnpm run build              # tsc → dist/ (required before `pnpm publish`, not before running)
 ```
 
 ## Project layout
@@ -50,9 +50,9 @@ src/
 bin/
   swarms.js             node entry; runs TS via tsx in dev, falls back to dist/ in installed envs
 scripts/
-  dev.sh, publish.sh    local dev + release helpers
+  dev.sh, install.sh    local dev helper + curl-able installer
+tests/                  node:test suites (run with `pnpm test`)
 docs/                   localized READMEs
-.github/workflows/      CI for npm publish
 ```
 
 Detailed file-by-file map lives in the [Project layout](./README.md#project-layout) section of the main README.
@@ -66,7 +66,7 @@ Detailed file-by-file map lives in the [Project layout](./README.md#project-layo
 
 ## Coding standards
 
-- **TypeScript strict mode.** `npm run typecheck` must pass.
+- **TypeScript strict mode.** `pnpm run typecheck` must pass.
 - **No new runtime dependencies** without a real justification in the PR description. Every dependency is a footprint on the install size and a future security-update obligation.
 - **No telemetry.** The CLI ships zero telemetry. Don't add any.
 - **Don't add config-file persistence.** All config is environment-driven by design — do not write a `~/.swarmsrc` reader without first opening an issue.
@@ -79,18 +79,17 @@ Detailed file-by-file map lives in the [Project layout](./README.md#project-layo
 
 ## Testing your change
 
-There is no automated test suite at the moment. Until one exists, you are expected to manually verify your change:
-
-1. `npm run typecheck` must pass.
-2. `npm run build` must succeed.
-3. Run the smoke test:
+1. `pnpm test` must pass — the suite lives in `tests/` (Node's built-in `node:test` runner via `tsx`; all network calls are mocked). Add or extend tests for any command or lib behavior you change.
+2. `pnpm run typecheck` must pass.
+3. `pnpm run build` must succeed.
+4. Run the smoke test:
    ```bash
    ./bin/swarms.js --help
    ./bin/swarms.js --version
    ```
-4. Exercise the specific command path you changed. If you touched `launch agent`, run `swarms launch agent` end-to-end (a real API key against the live marketplace, or against a manifest validation flag if you added one).
-5. For UI / output changes, run the command in a real terminal and visually verify the output. Also run it under `CI=1 NO_COLOR=1` to confirm the non-interactive code path still looks right.
-6. For changes that touch network behavior, run the failing path (bad API key, 429, network down) and confirm the error message is useful.
+5. Exercise the specific command path you changed. If you touched `launch agent`, run `swarms launch agent` end-to-end (a real API key against the live marketplace, or against a manifest validation flag if you added one).
+6. For UI / output changes, run the command in a real terminal and visually verify the output. Also run it under `CI=1 NO_COLOR=1` to confirm the non-interactive code path still looks right.
+7. For changes that touch network behavior, run the failing path (bad API key, 429, network down) and confirm the error message is useful.
 
 When you open the PR, list the exact commands you ran and their outcomes. "I ran the smoke test" is not enough; "I ran `swarms launch agent --manifest ./fixtures/agent.json` against the live API and the agent appeared at the printed `listing_url`" is.
 
@@ -131,20 +130,23 @@ We do not require translation parity. A translation can lag the English README b
 
 ## Releasing (maintainers)
 
-Releases are gated to maintainers. The script handles everything:
+Releases are gated to maintainers and published with pnpm. pnpm publishes to the **same npm registry** as `npm publish` — same package, same auth:
 
 ```bash
-scripts/publish.sh patch              # 0.1.0 → 0.1.1 (default)
-scripts/publish.sh minor              # 0.1.0 → 0.2.0
-scripts/publish.sh major              # 0.1.0 → 1.0.0
-scripts/publish.sh 1.2.3              # explicit version
-scripts/publish.sh patch --dry        # preview; doesn't publish
-scripts/publish.sh patch --tag beta   # publish under dist-tag 'beta'
+pnpm login                            # once; or put an npm automation token in ~/.npmrc
+pnpm version patch                    # or minor / major / an explicit 1.2.3 — bumps package.json + git tag
+pnpm publish                          # runs prepublishOnly (tsc → dist/), then publishes
+git push --follow-tags
 ```
 
-The publish script enforces a clean tree, `main` branch, and a successful `npm whoami` before doing anything. It runs typecheck + build, then `npm publish`, commits the version bump, tags it, and pushes (override with `--no-push`, `--allow-dirty`, `--allow-branch`).
+Useful variants:
 
-CI (`.github/workflows/npm-publish.yml`) auto-publishes a patch bump on every push to `main` when an `NPM_TOKEN` secret is configured. If you are landing a major or minor change, run `scripts/publish.sh minor` (or `major`) locally first so the version is correct before CI picks it up.
+```bash
+pnpm publish --dry-run                # preview the exact tarball contents; publishes nothing
+pnpm publish --tag beta               # publish under the 'beta' dist-tag instead of 'latest'
+```
+
+`pnpm publish` enforces a clean working tree and the `main` branch by default (`--no-git-checks` overrides, but prefer not to). The `files` allowlist in `package.json` keeps `src/`, `tests/`, and docs out of the tarball — verify with the `--dry-run` file listing before your first publish.
 
 ## Security
 
