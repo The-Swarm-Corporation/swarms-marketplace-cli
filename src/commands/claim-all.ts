@@ -36,14 +36,16 @@ interface Target {
   token_address: string;
 }
 
-async function fetchGlobalTargets(): Promise<Target[]> {
-  // Paginate up to 500 per page; the endpoint caps at 500.
+async function fetchOwnTargets(): Promise<Target[]> {
+  // Paginate up to 500 per page; the endpoint caps at 500. The endpoint
+  // returns only the authenticated caller's tokenized products.
   const out: Target[] = [];
   let page = 1;
   const limit = 500;
   while (true) {
     const body = await get<GlobalTokenizedResponse>(
       `/api/get-tokenized-products?type=all&limit=${limit}&page=${page}`,
+      { auth: true },
     );
     const items = body.data ?? [];
     for (const p of items) {
@@ -51,7 +53,7 @@ async function fetchGlobalTargets(): Promise<Target[]> {
     }
     if (out.length >= body.total || items.length < limit) break;
     page++;
-    if (page > 20) break; // hard stop at 10,000 mints
+    if (page > 20) break;
   }
   return out;
 }
@@ -60,18 +62,8 @@ export function registerClaimAll(program: Command): void {
   program
     .command('claim-all')
     .description(
-      'Claim trading fees across many tokenized products. ' +
-        'Scoped to one user by default; use --global to walk every tokenized mint.',
-    )
-    .option(
-      '-u, --user <username>',
-      'Your swarms.world username (required unless --global or --user-id is set)',
-    )
-    .option('--user-id <id>', 'Your user UUID (alternative to --user)')
-    .option(
-      '--global',
-      'Iterate every tokenized mint via /api/get-tokenized-products. ' +
-        'Your wallet only collects fees from products it owns; the rest no-op.',
+      'Claim trading fees across every tokenized product you own. ' +
+        'Requires an API key (to enumerate your mints) and a wallet key (to sign claims).',
     )
     .option(
       '--private-key <base58>',
@@ -80,52 +72,31 @@ export function registerClaimAll(program: Command): void {
     .option('--dry-run', "Print the list of mints that would be claimed, but don't claim.")
     .action(
       async (opts: {
-        user?: string;
-        userId?: string;
-        global?: boolean;
         privateKey?: string;
         dryRun?: boolean;
       }) => {
         try {
-          // The new /api/user-products contract no longer returns token addresses,
-          // so user-scoped enumeration is not possible from the public API. We
-          // unconditionally walk the global tokenized list; the wallet itself is
-          // the identity used by the claim endpoint, so unowned mints no-op.
-          if (opts.user || opts.userId) {
-            console.log('');
-            console.log(
-              info(
-                '`--user` is informational only — claim-all walks every tokenized mint and the wallet decides what it can collect. Proceeding…',
-              ),
-            );
-          }
-
           const listSpinner = ora({
-            text: 'Fetching every tokenized product on the marketplace…',
+            text: 'Fetching your tokenized products…',
             color: 'red',
           }).start();
           let targets: Target[];
           try {
-            targets = await fetchGlobalTargets();
+            targets = await fetchOwnTargets();
           } finally {
             listSpinner.stop();
           }
 
           if (targets.length === 0) {
             console.log('');
-            console.log(info('No tokenized products found on the marketplace.'));
-            console.log(
-              info(
-                'Tip: `swarms list-tokenized --limit 50` to inspect the catalog.',
-              ),
-            );
+            console.log(info('You have no tokenized products yet — try `swarms launch token`.'));
             return;
           }
 
           console.log('');
           console.log(
             `  ${theme.chip(' CLAIM ALL ')}  ${theme.text(
-              `${targets.length} mint${targets.length === 1 ? '' : 's'} (global)`,
+              `${targets.length} mint${targets.length === 1 ? '' : 's'}`,
             )}`,
           );
           console.log(divider());

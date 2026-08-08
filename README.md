@@ -35,7 +35,7 @@ The official command-line interface for the [Swarms Marketplace](https://swarms.
 | Publish a prompt                   | `swarms launch prompt`                           | API key                |
 | Launch on-chain token for an agent | `swarms launch token`                            | API key + wallet key   |
 | List your published products       | `swarms list`                                    | API key                |
-| Browse every tokenized product     | `swarms list-tokenized` (alias `swarms tokens`)  | None                   |
+| List your tokenized products       | `swarms list-tokenized` (alias `swarms tokens`)  | API key                |
 | Open a product's listing page      | `swarms open <id\|ca>`                            | None                   |
 | Claim fees on a single mint        | `swarms claim --ca <mint>`                       | Wallet key             |
 | Batch-claim fees                   | `swarms claim-all`                               | Wallet key             |
@@ -87,7 +87,6 @@ swarms api-key
 
 # 2. Export it
 export SWARMS_API_KEY="sk-…"
-export SWARMS_USERNAME="your-username"   # optional, but skips --user on most commands
 
 # 3. Verify auth
 swarms login
@@ -102,7 +101,7 @@ swarms launch agent \
 # 5. See what you've published
 swarms list
 
-# 6. Browse the marketplace
+# 6. See your tokenized launches
 swarms list-tokenized
 ```
 
@@ -115,7 +114,7 @@ export SWARMS_API_KEY="sk-…"
 swarms whoami      # confirms key is loaded; prints the first/last 4 chars
 ```
 
-Read-only commands that do not modify your account (notably `list-tokenized` and the `api-key` opener) work without an API key. Every other command requires one.
+Only `api-key` (which just opens the keys page in your browser) is callable without an API key. Every other command — including `list-tokenized` — requires one.
 
 ## Configuration
 
@@ -124,7 +123,6 @@ All configuration is environment-driven. The CLI does not read or write any conf
 | Variable                     | Purpose                                                                                       | Default                |
 | ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------- |
 | `SWARMS_API_KEY`             | Bearer token for marketplace endpoints (publish, list, account-scoped reads).                  | _required for auth_    |
-| `SWARMS_USERNAME`            | Default `--user` for `list`. Lets `swarms list` work with no flags.                              | _(pass --user)_        |
 | `SWARMS_WALLET_PRIVATE_KEY`  | Wallet private key (base58) for on-chain operations. Held in memory only.                      | _(prompts if unset)_   |
 | `PRIVATE_KEY`                | Alias for `SWARMS_WALLET_PRIVATE_KEY`, for compatibility with common `.env` conventions.       | _(prompts if unset)_   |
 | `SWARMS_NO_ANIM`             | Set to any value to disable the welcome animation, even in an interactive terminal.            | _(animate if TTY)_     |
@@ -144,7 +142,7 @@ swarms launch prompt          Publish a prompt
 swarms launch token           Tokenize an agent on chain
 
 swarms list                   Your published products, as a red/white tree
-swarms list-tokenized         Every tokenized product on the marketplace
+swarms list-tokenized         Your tokenized agents and prompts
                               (alias: swarms tokens)
 swarms open <id|ca>           Open a product's listing page in your browser
 
@@ -241,18 +239,14 @@ swarms launch token
 
 ### `list`
 
-Your published products, rendered as a tree grouped by type. Calls `POST /api/user-products`.
+Your published products, rendered as a tree grouped by type. Requires `SWARMS_API_KEY`; the server resolves the caller from the key. Calls `POST /api/user-products`.
 
 ```
 swarms list
-  [-u, --user <username>]
-  [--user-id <id>]
   [--tokenized]
   [--json]
 ```
 
-- `--user` defaults to `$SWARMS_USERNAME` if unset.
-- `--user-id` accepts a UUID as an alternative to `--user`.
 - `--tokenized` filters to products whose `business_model === 'tokenized'`.
 - `--json` outputs the raw API payload for piping into other tools.
 
@@ -297,22 +291,24 @@ Example output:
 
 ### `list-tokenized`
 
-Every tokenized product on the marketplace. Public read; no API key required. Aliased as `swarms tokens` for brevity.
+Your own tokenized agents and prompts. Requires `SWARMS_API_KEY`; results are scoped to the caller by the server. Aliased as `swarms tokens` for brevity.
 
 ```
 swarms list-tokenized
-  [--type <all|agent|prompt|tool>]
+  [--type <all|agent|prompt>]
   [--limit <n>]     # 1..500, default 100
   [--page <n>]      # default 1
   [--json]
 ```
 
-`--json` payload shape (stable, field names mirror the upstream API). Pagination lives under `pagination`; items live under `data`:
+`--json` payload shape (mirrors `/api/get-tokenized-products`). Pagination lives under `pagination`; items live under `data`:
 
 ```json
 {
-  "total": 1247,
-  "counts": { "agents": 854, "prompts": 231, "tools": 162 },
+  "user_id": "uuid",
+  "username": "kye",
+  "total": 4,
+  "counts": { "agents": 2, "prompts": 2 },
   "data": [
     {
       "id": "uuid",
@@ -326,14 +322,14 @@ swarms list-tokenized
   "pagination": {
     "page": 1,
     "limit": 100,
-    "total_pages": 13,
-    "has_next": true,
+    "total_pages": 1,
+    "has_next": false,
     "has_prev": false
   }
 }
 ```
 
-A `400` is returned for an invalid `--type`; the body is `{ "error": "Invalid 'type'. Use one of: all, agent, prompt, tool." }`.
+Errors: `401` if the key is missing or invalid; `400` for an invalid `--type` (`{ "error": "Invalid 'type'. Use one of: all, agent, prompt (plurals also accepted)." }`); `404` if the user record cannot be resolved from the key.
 
 ### `open`
 
@@ -392,21 +388,16 @@ Example output:
 
 ### `claim-all`
 
-Claim fees across many products in one command, reusing one wallet key for the batch.
+Claim fees across every tokenized product you own, reusing one wallet key for the batch.
 
 ```
 swarms claim-all
-  [-u, --user <username>]
-  [--user-id <id>]
-  [--global]
   [--private-key <base58>]
   [--dry-run]
 ```
 
-The CLI enumerates every tokenized mint on the marketplace via `GET /api/get-tokenized-products` and attempts a claim against each using your wallet key. The wallet itself is the identity used by the claim endpoint, so any mint you do not own simply no-ops and is reported as `nothing to claim`.
+The CLI enumerates the caller's tokenized mints via `GET /api/get-tokenized-products` (Bearer auth — your API key identifies the owner) and attempts a claim against each using your wallet key.
 
-- `--user` / `--user-id` / `$SWARMS_USERNAME` are accepted for forward-compatibility but currently treated as informational. They do not narrow the candidate set because the public `user-products` payload no longer carries token addresses.
-- `--global` is the default behavior; the flag is preserved for explicitness.
 - `--dry-run` prints the list of mints that would be claimed and exits without submitting any transaction.
 - Continue-on-failure: a single mint failing does not abort the batch. The final line reports `N claimed · M nothing-to-claim · K failed · X SOL total`.
 - Exit code is `1` if any individual claim failed, `0` otherwise.
@@ -475,7 +466,7 @@ Example tail:
 | Surface           | Default                                  | Machine-readable                                |
 | ----------------- | ---------------------------------------- | ----------------------------------------------- |
 | `list`            | Tree, grouped by type                    | `--json` → raw `/api/user-products` payload     |
-| `list-tokenized`  | Paged flat list                          | `--json` → `{ total, counts, products, … }`     |
+| `list-tokenized`  | Paged flat list (caller's products)      | `--json` → `{ user_id, username, total, counts, data, pagination }` |
 | `launch *`        | Result summary (`id`, `listing_url`)     | Fields printed line-by-line; parseable          |
 | `claim`           | Summary + signature + SOL claimed        | Always prints structured fields                 |
 | `claim-all`       | Per-mint status + totals                 | Exit code reflects per-mint failures            |
@@ -485,8 +476,8 @@ Example tail:
 All `--json` outputs are stable JSON suitable for `jq` filtering or programmatic consumption. Field names mirror the upstream API. Examples:
 
 ```bash
-# Top 5 tokenized agents on the marketplace by recency
-swarms list-tokenized --type agent --limit 5 --json | jq '.products[].name'
+# Your 5 most recent tokenized agents
+swarms list-tokenized --type agent --limit 5 --json | jq '.data[].name'
 
 # All token CAs you own
 swarms list --json | jq -r '
@@ -604,15 +595,15 @@ The CLI assumes a trustworthy local environment (the user controls their own mac
 ## Performance and limits
 
 - Marketplace endpoints are rate-limited. The CLI does not retry automatically; in batch loops, cap parallelism with `xargs -P` or sleep between iterations.
-- `claim-all` makes one network call per tokenized mint on the marketplace. At current volumes that is on the order of seconds per mint; plan accordingly when scheduling.
-- `list-tokenized` is paged; `--limit 500` is the maximum per page. Mirror the full catalog by walking pages until `has_next` is `false`.
-- `list` returns up to 100 products of each type per call. Larger accounts should use `--user-id` and consume `--json` output.
+- `claim-all` makes one network call per tokenized mint you own. Plan scheduling around the size of your portfolio.
+- `list-tokenized` is paged; `--limit 500` is the maximum per page. Walk pages until `has_next` is `false` to enumerate all of your tokenized products.
+- `list` returns up to 100 products of each type per call. Larger accounts should consume `--json` output and iterate the per-type endpoints if needed.
 - The Node.js process exits as soon as the current command completes; no background work continues after exit.
 
 ## Troubleshooting
 
 **`SWARMS_API_KEY is not set`**  
-You need an API key for every command except `api-key`, `login`, `whoami`, and `list-tokenized`. Run `swarms api-key` to grab one, then `export SWARMS_API_KEY="…"`.
+You need an API key for every command except `api-key`. Run `swarms api-key` to grab one, then `export SWARMS_API_KEY="…"`.
 
 **HTTP 401 Unauthorized**  
 The API key was rejected. Causes: typo in the env var, or the key was revoked at <https://swarms.world/platform/api-keys>.
@@ -679,10 +670,10 @@ src/
     launch-prompt.ts    POST /api/add-prompt
     launch-token.ts     POST /api/token/launch
     list.ts             POST /api/user-products → user products as a tree
-    list-tokenized.ts   GET  /api/get-tokenized-products → global flat browser
+    list-tokenized.ts   GET  /api/get-tokenized-products → caller's tokenized products
     open.ts             open a product's listing page in the browser
     claim.ts            POST /api/product/claimfees (one mint)
-    claim-all.ts        enumerate every tokenized mint + claim against each
+    claim-all.ts        enumerate your tokenized mints + claim against each
 bin/
   swarms.js             node entry; runs TS via tsx in dev, falls back to dist/ in installed envs
 scripts/

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import ora from 'ora';
 import { ApiError, post } from '../lib/api.js';
-import { getBaseUrl, getUsername } from '../lib/config.js';
+import { getBaseUrl } from '../lib/config.js';
 import { fail, info, theme } from '../lib/theme.js';
 
 type BusinessModel = 'free' | 'paid' | 'tokenized';
@@ -24,6 +24,14 @@ interface UserProductsSummary {
   tokenized_products: number;
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
 interface UserProductsResponse {
   user_id: string;
   username: string;
@@ -31,6 +39,7 @@ interface UserProductsResponse {
   agents: UserProduct[];
   prompts: UserProduct[];
   tools: UserProduct[];
+  pagination?: Pagination;
   summary: UserProductsSummary;
 }
 
@@ -91,50 +100,23 @@ export function registerList(program: Command): void {
     .command('list')
     .description(
       'List your published products as a tree, grouped by type ' +
-        '(agents / prompts / tools).',
+        '(agents / prompts / tools). Scoped to the API key holder.',
     )
-    .option(
-      '-u, --user <username>',
-      'swarms.world username. Defaults to $SWARMS_USERNAME if set.',
-    )
-    .option('--user-id <id>', 'User UUID (alternative to --user).')
     .option('--tokenized', 'Only show tokenized products.')
     .option('--json', 'Print the raw API payload instead of the tree view.')
     .action(
       async (opts: {
-        user?: string;
-        userId?: string;
         tokenized?: boolean;
         json?: boolean;
       }) => {
-        const user = opts.user || getUsername();
-        if (!user && !opts.userId) {
-          console.log('');
-          console.log(
-            fail(
-              'Pass --user <username> or --user-id <uuid>, or export $SWARMS_USERNAME.',
-            ),
-          );
-          process.exitCode = 1;
-          return;
-        }
-
         const spinner = ora({
           text: 'Fetching your products…',
           color: 'red',
         }).start();
         try {
-          const body: Record<string, unknown> = {
-            page: 1,
-            limit: 100,
-            product_type: 'all',
-          };
-          if (opts.userId) body.user_id = opts.userId;
-          else if (user) body.username = user;
-
           const data = await post<UserProductsResponse>(
             '/api/user-products',
-            body,
+            { page: 1, limit: 100, product_type: 'all' },
           );
           spinner.stop();
 
@@ -205,12 +187,12 @@ export function registerList(program: Command): void {
           if (tokenizedCount > 0) {
             console.log(
               `  ${theme.dim('?')} ${theme.textMuted('claim fees with')} ${theme.text(
-                `swarms claim-all --global`,
+                `swarms claim-all`,
               )}`,
             );
           }
           console.log(
-            `  ${theme.dim('?')} ${theme.textMuted('browse global tokenized products with')} ${theme.text(
+            `  ${theme.dim('?')} ${theme.textMuted('see just your tokenized products with')} ${theme.text(
               'swarms tokens',
             )}`,
           );

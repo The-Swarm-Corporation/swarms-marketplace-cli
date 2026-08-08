@@ -21,6 +21,8 @@ interface Pagination {
 }
 
 interface TokenizedResponse {
+  user_id: string;
+  username: string;
   total: number;
   counts: { agents: number; prompts: number };
   data: TokenizedProduct[];
@@ -32,8 +34,8 @@ export function registerListTokenized(program: Command): void {
     .command('list-tokenized')
     .alias('tokens')
     .description(
-      'List every tokenized product on the marketplace ' +
-        '(global, no API key required).',
+      'List your tokenized agents and prompts. Requires an API key; ' +
+        'results are scoped to the caller.',
     )
     .option(
       '--type <all|agent|prompt>',
@@ -46,7 +48,7 @@ export function registerListTokenized(program: Command): void {
     .action(
       async (opts: { type: string; limit: string; page: string; json?: boolean }) => {
         const spinner = ora({
-          text: 'Fetching tokenized products…',
+          text: 'Fetching your tokenized products…',
           color: 'red',
         }).start();
         try {
@@ -57,6 +59,7 @@ export function registerListTokenized(program: Command): void {
           });
           const body = await get<TokenizedResponse>(
             `/api/get-tokenized-products?${qs.toString()}`,
+            { auth: true },
           );
           spinner.stop();
 
@@ -76,13 +79,13 @@ export function registerListTokenized(program: Command): void {
           );
           console.log(
             `  ${theme.textMuted(
-              `agents=${body.counts.agents}  prompts=${body.counts.prompts}`,
+              `owner=${body.username}  agents=${body.counts.agents}  prompts=${body.counts.prompts}`,
             )}`,
           );
           console.log(divider());
 
           if (items.length === 0) {
-            console.log(info('No tokenized products in this page.'));
+            console.log(info('You have no tokenized products yet — try `swarms launch token`.'));
             return;
           }
 
@@ -106,8 +109,13 @@ export function registerListTokenized(program: Command): void {
         } catch (err) {
           spinner.stop();
           console.log('');
-          if (err instanceof ApiError) console.log(fail(err.message));
-          else console.log(fail(err instanceof Error ? err.message : String(err)));
+          if (err instanceof ApiError) {
+            console.log(fail(err.message));
+            if (err.status === 401)
+              console.log(info('Run `swarms login` to set an API key.'));
+          } else {
+            console.log(fail(err instanceof Error ? err.message : String(err)));
+          }
           process.exitCode = 1;
         }
       },

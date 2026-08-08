@@ -75,7 +75,6 @@ All configuration is environment-driven. The CLI does not read or write any conf
 | Variable | Read by | Required? | Default | Behavior |
 | --- | --- | --- | --- | --- |
 | `SWARMS_API_KEY` | every authenticated command | Yes (for auth) | unset | Sent as `Authorization: Bearer <key>` on all authenticated requests. Trimmed; empty string treated as unset. |
-| `SWARMS_USERNAME` | `list`, `claim-all` (informational) | No | unset | Default value for `--user` / username inputs. Lets `swarms list` work with no flags. |
 | `SWARMS_WALLET_PRIVATE_KEY` | `claim`, `claim-all`, `launch token` | No (prompts if unset) | unset | Base58 wallet secret key. Preferred name. Never persisted. |
 | `PRIVATE_KEY` | `claim`, `claim-all`, `launch token` | No (prompts if unset) | unset | Fallback wallet secret key. Matches common `.env` conventions. Used only when `SWARMS_WALLET_PRIVATE_KEY` is unset. |
 | `SWARMS_NO_ANIM` | banner renderer | No | unset | Any truthy value disables the welcome animation. |
@@ -99,7 +98,7 @@ Resolution priority for wallet keys (per `getWalletPrivateKey()` at `src/lib/con
 | Surface | Mechanism | Notes |
 | --- | --- | --- |
 | Marketplace API (publish, list, account-scoped reads) | `Authorization: Bearer $SWARMS_API_KEY` | Set per request by `src/lib/api.ts` `post()` / `get()`. Missing key throws `ApiError(401)` before any network call. |
-| Public read (`/api/get-tokenized-products`) | None | The `get()` helper sets `auth: false` by default; explicit opt-in via `auth: true`. |
+| Caller-scoped tokenized list (`/api/get-tokenized-products`) | `Authorization: Bearer $SWARMS_API_KEY` | Server resolves `user_id` from the key and returns only that user's tokenized products. Missing key → 401. |
 | Fee claim (`/api/product/claimfees`) | Wallet signature (private key in body) | API key is **not** sent (`auth: false`); wallet is the identity. |
 | Token launch (`/api/token/launch`) | API key **and** wallet private key in body | Hybrid: Bearer auth gates the request; the on-chain transaction is signed by the wallet. |
 
@@ -382,24 +381,19 @@ swarms launch token
 
 ```
 swarms list
-  [-u, --user <username>]
-  [--user-id <id>]
   [--tokenized]
   [--json]
 ```
 
-**Behavior**: Renders **your** published products as a red/white tree grouped by type (`agents`, `prompts`, `tools`). Source: `src/commands/list.ts`. Calls `POST /api/user-products` with `{ page: 1, limit: 100, product_type: 'all', username | user_id }`.
+**Behavior**: Renders the caller's published products as a red/white tree grouped by type (`agents`, `prompts`, `tools`). The user is resolved server-side from `SWARMS_API_KEY` — there is no username or user-id input. Source: `src/commands/list.ts`. Calls `POST /api/user-products` with `{ page: 1, limit: 100, product_type: 'all' }`.
 
 **Inputs**
 
 | Name | Kind | Type | Default | Required | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `-u`, `--user <username>` | option | string | `$SWARMS_USERNAME` | Yes (this or `--user-id` or env) | swarms.world username. |
-| `--user-id <id>` | option | UUID | unset | Yes (this or `--user` or env) | User UUID alternative. Takes precedence when both are present (`if (opts.userId) … else if (user) …`). |
 | `--tokenized` | flag | boolean | off | No | Filters output to products with `business_model === 'tokenized'`. |
 | `--json` | flag | boolean | off | No | Prints the raw API payload instead of the tree. |
-| `$SWARMS_API_KEY` | env | string | — | Yes | Bearer auth. |
-| `$SWARMS_USERNAME` | env | string | — | No | Default for `--user`. |
+| `$SWARMS_API_KEY` | env | string | — | **Yes** | Bearer auth; the server uses it to resolve the caller. |
 
 **Outputs**
 
@@ -408,14 +402,14 @@ swarms list
 | stdout (default) | Header `▎ @<username>  ·  N products  ·  K tokenized  ·  <base-url>` followed by a tree (see §10.1). |
 | stdout (`--json`) | The full `/api/user-products` response, pretty-printed (`JSON.stringify(data, null, 2)`). |
 | stdout (no products) | `No products yet — try swarms launch agent to publish.` (or, with `--tokenized`, `No tokenized products yet — try swarms launch token.`). |
-| Exit code | `0` on success, `1` on missing identifier, API 401, or any other API non-2xx. |
+| Exit code | `0` on success, `1` on API 401 or any other API non-2xx. |
 
 **Errors**
 
 | Condition | Behavior |
 | --- | --- |
-| No `--user`, no `--user-id`, no `$SWARMS_USERNAME` | `Pass --user <username> or --user-id <uuid>, or export $SWARMS_USERNAME.` |
 | API 401 | Adds hint: `Run swarms login to verify your API key.` |
+| API 404 | Body `User associated with API key not found` — the key did not resolve to a user record. |
 
 **Endpoint**: `POST https://swarms.world/api/user-products`
 
@@ -425,10 +419,7 @@ swarms list
 {
   "page": 1,
   "limit": 100,
-  "product_type": "all",
-  // exactly one of:
-  "user_id": "uuid",
-  "username": "kye"
+  "product_type": "all"
 }
 ```
 
@@ -440,7 +431,7 @@ swarms list
 
 ```
 swarms list-tokenized
-  [--type <all|agent|prompt|tool>]
+  [--type <all|agent|prompt>]
   [--limit <n>]    # 1..500, default 100
   [--page <n>]     # default 1
   [--json]
@@ -448,28 +439,29 @@ swarms list-tokenized
 swarms tokens    # alias
 ```
 
-**Behavior**: Fetches every tokenized product on the marketplace (paged, public). No API key required. Source: `src/commands/list-tokenized.ts`. Calls `GET /api/get-tokenized-products?type=…&limit=…&page=…`.
+**Behavior**: Fetches the **caller's** tokenized products (paged). Requires `SWARMS_API_KEY`; the server resolves `user_id` from the key and scopes results to that user. Tools are not tokenizable and are excluded. Source: `src/commands/list-tokenized.ts`. Calls `GET /api/get-tokenized-products?type=…&limit=…&page=…` with `Authorization: Bearer <key>`.
 
 **Inputs**
 
 | Name | Kind | Type | Default | Required | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `--type <…>` | option | enum string | `all` | No | Server-validated. Accepted: `all`, `agent`, `prompt`, `tool`. |
+| `--type <…>` | option | enum string | `all` | No | Server-validated. Accepted: `all`, `agent`, `prompt` (plurals also accepted). |
 | `--limit <n>` | option | integer 1–500 | `100` | No | Server caps at 500. |
 | `--page <n>` | option | integer ≥ 1 | `1` | No | Page number, 1-indexed. |
 | `--json` | flag | boolean | off | No | Print raw JSON instead of the formatted view. |
+| `SWARMS_API_KEY` | env | string | — | **Yes** | Bearer token; the server uses it to resolve the caller. |
 
 **Outputs**
 
 | Channel | Content |
 | --- | --- |
-| stdout (default) | Header `▎ TOKENIZED   total page p/T · N shown` + `agents=A  prompts=P` line + a divider + per-product `[type] Name`, `Token CA`, and `URL` lines. When more pages exist, prints `More results — re-run with --page <next>.` |
+| stdout (default) | Header `▎ TOKENIZED   total page p/T · N shown` + `owner=<username>  agents=A  prompts=P` line + a divider + per-product `[type] Name`, `Token CA`, and `URL` lines. When more pages exist, prints `More results — re-run with --page <next>.` |
 | stdout (`--json`) | The full response (see §10.2). |
-| Exit code | `0` on success, `1` on API non-2xx. |
+| Exit code | `0` on success, `1` on API non-2xx. On `401`, also prints `Run \`swarms login\` to set an API key.` |
 
 **Endpoint**: `GET https://swarms.world/api/get-tokenized-products?type=<…>&limit=<…>&page=<…>`
 
-Server returns `400` for invalid `type` with body `{ "error": "Invalid 'type'. Use one of: all, agent, prompt, tool." }`.
+Server errors: `400` for invalid `type` (`{ "error": "Invalid 'type'. Use one of: all, agent, prompt (plurals also accepted)." }`); `401` for missing or invalid key; `404` when no user record matches the key.
 
 ---
 
@@ -582,32 +574,27 @@ swarms claim
 
 ```
 swarms claim-all
-  [-u, --user <username>]
-  [--user-id <id>]
-  [--global]
   [--private-key <base58>]
   [--dry-run]
 ```
 
-**Behavior**: Claims trading fees across many tokenized products in one command, reusing a single wallet key. Source: `src/commands/claim-all.ts`.
+**Behavior**: Claims trading fees across every tokenized product the caller owns, reusing a single wallet key. Source: `src/commands/claim-all.ts`.
 
-The CLI enumerates **every** tokenized mint on the marketplace via `GET /api/get-tokenized-products?type=all&limit=500&page=<n>` (hard stop at page 20 → 10,000 mints) and attempts a claim against each using your wallet key. The wallet itself is the identity used by the claim endpoint, so any mint you do not own simply no-ops and is reported as `nothing-to-claim`.
+The CLI enumerates the caller's tokenized mints via `GET /api/get-tokenized-products?type=all&limit=500&page=<n>` (Bearer auth — the server returns only the caller's tokenized products) and attempts a claim against each using your wallet key.
 
 **Inputs**
 
 | Name | Kind | Type | Default | Required | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `-u`, `--user <username>` | option | string | unset | No | Currently informational only. Triggers a one-line notice and the global walk proceeds. Preserved for forward compatibility. |
-| `--user-id <id>` | option | UUID | unset | No | Same: informational only. |
-| `--global` | flag | boolean | always on | No | Default behavior. Flag kept for explicitness. |
 | `--private-key <base58>` | option | base58 string | env / prompt | Yes (resolved) | Flag → `$SWARMS_WALLET_PRIVATE_KEY` → `$PRIVATE_KEY` → interactive prompt. |
 | `--dry-run` | flag | boolean | off | No | Prints the list of mints that would be claimed, then exits 0 without submitting any transactions. |
+| `$SWARMS_API_KEY` | env | string | — | **Yes** | Bearer auth used to enumerate the caller's tokenized products. |
 
 **Outputs**
 
 | Channel | Content |
 | --- | --- |
-| stdout | Header `CLAIM ALL  N mints (global)`, divider, one line per mint (`[type] Name  <CA>`), then per-claim status lines. Final summary: `DONE  X claimed · Y nothing-to-claim · Z failed · S SOL total`. |
+| stdout | Header `CLAIM ALL  N mints`, divider, one line per mint (`[type] Name  <CA>`), then per-claim status lines. Final summary: `DONE  X claimed · Y nothing-to-claim · Z failed · S SOL total`. |
 | Exit code | `0` if every individual claim succeeded; `1` if any claim threw an error (the batch continues regardless). |
 
 **Per-mint behavior**
@@ -620,7 +607,7 @@ The CLI enumerates **every** tokenized mint on the marketplace via `GET /api/get
 | `post()` throws (`ApiError` or other) | `failed` | `✗ <name>  <ca>  <message>` |
 
 **Endpoints**:
-- `GET https://swarms.world/api/get-tokenized-products?type=all&limit=500&page=<n>` for enumeration.
+- `GET https://swarms.world/api/get-tokenized-products?type=all&limit=500&page=<n>` for enumeration (Bearer auth).
 - `POST https://swarms.world/api/product/claimfees` per mint, without Bearer auth.
 
 ---
@@ -733,7 +720,7 @@ cat agent.json | swarms launch agent -m -
 | `/api/add-prompt` | POST | Bearer | `launch prompt` |
 | `/api/token/launch` | POST | Bearer + wallet PK in body | `launch token` |
 | `/api/user-products` | POST | Bearer | `list` |
-| `/api/get-tokenized-products` | GET | none | `list-tokenized`, `open` (mint resolution), `claim-all` (enumeration) |
+| `/api/get-tokenized-products` | GET | Bearer | `list-tokenized`, `open` (mint resolution), `claim-all` (enumeration) |
 | `/api/product/claimfees` | POST | none (wallet signature in body) | `claim`, `claim-all` |
 | `https://swarms.world/platform/api-keys` | (browser) | n/a | `api-key` |
 | `https://swarms.world/{type}/{id}` | (browser) | n/a | `open` (UUID fast path) |
@@ -764,8 +751,8 @@ Footer hints (printed conditionally):
 
 | Condition | Hint |
 | --- | --- |
-| `tokenizedCount > 0` | `? claim fees with swarms claim-all --global` |
-| Always | `? browse global tokenized products with swarms tokens` |
+| `tokenizedCount > 0` | `? claim fees with swarms claim-all` |
+| Always | `? see just your tokenized products with swarms tokens` |
 | `counts.agents + counts.prompts + counts.tools !== total_products` | `? breakdown: <a> agents · <p> prompts · <t> tools` |
 
 Badge mapping (`badge()` at `src/commands/list.ts:37-47`):
@@ -801,8 +788,10 @@ Badge mapping (`badge()` at `src/commands/list.ts:37-47`):
 
 ```jsonc
 {
-  "total": 1247,
-  "counts": { "agents": 854, "prompts": 231 },
+  "user_id": "uuid",
+  "username": "kye",
+  "total": 4,
+  "counts": { "agents": 2, "prompts": 2 },
   "data": [
     {
       "id": "uuid",
@@ -816,14 +805,14 @@ Badge mapping (`badge()` at `src/commands/list.ts:37-47`):
   "pagination": {
     "page": 1,
     "limit": 100,
-    "total_pages": 13,
-    "has_next": true,
+    "total_pages": 1,
+    "has_next": false,
     "has_prev": false
   }
 }
 ```
 
-> Field-name alignment: the CLI types declare `counts: { agents, prompts }` for `list-tokenized`; the server may also emit `tools`. The CLI does not depend on tool counts in its formatted output.
+> `user_id` / `username` identify the authenticated caller — results are server-scoped to that user. Tools are not tokenizable, so `counts` only carries `agents` and `prompts`.
 
 ### 10.4 `swarms claim` (success)
 
@@ -837,7 +826,7 @@ Badge mapping (`badge()` at `src/commands/list.ts:37-47`):
 ### 10.5 `swarms claim-all` (success)
 
 ```
-  CLAIM ALL  1247 mints (global)
+  CLAIM ALL  4 mints
   ──────────────────────────────────────────────────────────
   [agent]  Research Agent       5Xy…solana-mint-address
   [agent]  Code Reviewer        3abc…xyz456
@@ -1102,7 +1091,7 @@ done
 | `bin/swarms.js` | Node entry. Dev: loads `src/index.ts` via `tsx`. Installed: loads `dist/index.js`. Enforces Node ≥ 18. |
 | `src/index.ts` | Commander wiring, custom `Help` renderer (`SwarmsHelp`), no-args welcome path. |
 | `src/lib/api.ts` | `post()` / `get()` + `ApiError` + `formatHttpError()`. |
-| `src/lib/config.ts` | `getApiKey()`, `getUsername()`, `getBaseUrl()`, `isAllowedSwarmsHost()`, `getWalletPrivateKey()`. Hardcoded `API_BASE = 'https://swarms.world'`. |
+| `src/lib/config.ts` | `getApiKey()`, `getBaseUrl()`, `isAllowedSwarmsHost()`, `getWalletPrivateKey()`. Hardcoded `API_BASE = 'https://swarms.world'`. |
 | `src/lib/manifest.ts` | `loadManifest()` — file path or `-` for stdin. |
 | `src/lib/open.ts` | `openInBrowser()` with scheme + shell-meta safety. |
 | `src/lib/prompt.ts` | `prompt()`, `promptSecret()` — readline + raw-mode masked input. |
@@ -1117,7 +1106,7 @@ done
 | `src/commands/list-tokenized.ts` | `swarms list-tokenized` / `tokens` → `GET /api/get-tokenized-products`. |
 | `src/commands/open.ts` | `swarms open` — UUID fast path + mint resolution. |
 | `src/commands/claim.ts` | `swarms claim` → `POST /api/product/claimfees`. |
-| `src/commands/claim-all.ts` | `swarms claim-all` — global enumeration + per-mint claim. |
+| `src/commands/claim-all.ts` | `swarms claim-all` — enumerate the caller's tokenized products + per-mint claim. |
 
 ---
 
@@ -1132,18 +1121,17 @@ done
 | `launch prompt` | POST `/api/add-prompt` | Bearer | — | 1 | Publishes prompt |
 | `launch token` | POST `/api/token/launch` | Bearer + PK | required | 1 | On-chain tx |
 | `list` | POST `/api/user-products` | Bearer | — | 1 | — |
-| `list-tokenized` | GET `/api/get-tokenized-products` | none | — | 1 | — |
+| `list-tokenized` | GET `/api/get-tokenized-products` | Bearer | — | 1 | — |
 | `open` (UUID) | — | — | — | 0 | Launches browser |
 | `open` (mint) | GET `/api/get-tokenized-products` (paged) | none | — | 1..20 | Launches browser |
 | `claim` | POST `/api/product/claimfees` | none (PK in body) | required | 1 | On-chain tx |
-| `claim-all` | GET enumeration + POST per-mint | none | required | 1..20 + N | On-chain txs |
+| `claim-all` | GET enumeration + POST per-mint | Bearer (for GET) | required | 1..20 + N | On-chain txs |
 
 ## Appendix B — Quick env-var matrix
 
 | Variable | login | whoami | launch agent | launch prompt | launch token | list | list-tokenized | open | claim | claim-all | api-key |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `SWARMS_API_KEY` | required | required | required | required | required | required | — | — | — | — | — |
-| `SWARMS_USERNAME` | — | — | — | — | — | default for `--user` | — | — | — | informational | — |
+| `SWARMS_API_KEY` | required | required | required | required | required | required | required | — | — | required | — |
 | `SWARMS_WALLET_PRIVATE_KEY` | — | — | — | — | preferred | — | — | — | preferred | preferred | — |
 | `PRIVATE_KEY` | — | — | — | — | fallback | — | — | — | fallback | fallback | — |
 | `SWARMS_NO_ANIM` | banner | banner | banner | banner | banner | banner | banner | banner | banner | banner | banner |
