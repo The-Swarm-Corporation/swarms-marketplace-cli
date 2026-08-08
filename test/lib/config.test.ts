@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getApiKey, getUsername, getBaseUrl, getWalletPrivateKey, isAllowedSwarmsHost } from '../../src/lib/config.js';
+import { getApiKey, getBaseUrl, getWalletPrivateKey, isAllowedSwarmsHost } from '../../src/lib/config.js';
 
 describe('config', () => {
   const originalEnv = process.env;
@@ -36,28 +36,6 @@ describe('config', () => {
     it('should return undefined when SWARMS_API_KEY is only whitespace', () => {
       process.env.SWARMS_API_KEY = '   ';
       expect(getApiKey()).toBeUndefined();
-    });
-  });
-
-  describe('getUsername', () => {
-    it('should return SWARMS_USERNAME when set', () => {
-      process.env.SWARMS_USERNAME = 'testuser';
-      expect(getUsername()).toBe('testuser');
-    });
-
-    it('should trim whitespace from SWARMS_USERNAME', () => {
-      process.env.SWARMS_USERNAME = '  alice  ';
-      expect(getUsername()).toBe('alice');
-    });
-
-    it('should return undefined when SWARMS_USERNAME is not set', () => {
-      delete process.env.SWARMS_USERNAME;
-      expect(getUsername()).toBeUndefined();
-    });
-
-    it('should return undefined when SWARMS_USERNAME is empty', () => {
-      process.env.SWARMS_USERNAME = '';
-      expect(getUsername()).toBeUndefined();
     });
   });
 

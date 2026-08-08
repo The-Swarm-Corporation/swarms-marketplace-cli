@@ -36,7 +36,7 @@ scripts/dev.sh --watch      # build in watch mode
 scripts/dev.sh --clean      # wipe dist/ and node_modules first
 
 pnpm run typecheck          # tsc --noEmit
-pnpm test                   # node:test suites in tests/ (all network calls mocked)
+pnpm test                   # both suites: node:test (tests/) + vitest (test/); network is always mocked
 pnpm run build              # tsc → dist/ (required before `pnpm publish`, not before running)
 ```
 

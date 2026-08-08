@@ -12,7 +12,7 @@ Use **pnpm** for everything in development. Do not use npm or yarn; do not creat
 
 ```bash
 pnpm install              # install deps (CI uses --frozen-lockfile)
-pnpm test                 # run the test suite (tests/*.test.ts, node:test via tsx)
+pnpm test                 # both suites: node:test (tests/) + vitest (test/)
 pnpm run typecheck        # tsc --noEmit
 pnpm run build            # rm -rf dist && tsc → dist/  (keep the clean step — see below)
 pnpm run dev              # tsc --watch
@@ -59,6 +59,7 @@ src/lib/theme.ts        chalk palette, banner/mascot, ok/fail/info/label helpers
 src/commands/*.ts       one file per subcommand, each exporting register<Name>(program)
 bin/swarms.js           entry: tsx over src/ in a checkout, dist/ when installed
 tests/*.test.ts         node:test suites; tests/helpers.ts has the shared harness
+test/**/*.test.ts       vitest suites (vitest.config.ts at the repo root)
 scripts/dev.sh          dev pipeline; scripts/install.sh is the end-user curl installer
 docs/DOC.md             exhaustive reference (endpoints, I/O contracts, error tables)
 docs/README.*.md        localized READMEs (zh-CN, ja, hi, de, pl, …)
@@ -85,7 +86,10 @@ docs/README.*.md        localized READMEs (zh-CN, ja, hi, de, pl, …)
 
 ## Testing conventions
 
-- Runner: Node's built-in `node:test` through tsx (`pnpm test` → `node --import tsx --test tests/*.test.ts`). No test framework dependencies — keep it that way.
+- **Two suites exist**, both run by `pnpm test`:
+  - `tests/` — Node's built-in `node:test` through tsx (`pnpm run test:node`). Uses the shared harness in `tests/helpers.ts`.
+  - `test/` — vitest (`pnpm run test:vitest`; also `test:watch`, `test:coverage`), contributed via PR #11. Uses `vi.fn()` fetch mocks and describe/it style.
+- Put new tests where the neighboring coverage lives; don't port tests between suites without being asked. Both suites must stay green — if a CLI behavior changes, update the assertions in **both**.
 - `tests/helpers.ts` provides: `mockFetch()` (replaces `globalThis.fetch`, records url/method/headers/body), `forbidFetch()` (fails on any network call — use it for pre-network validation tests), `withEnv()` (scoped env mutation), `runCommand()` (fresh commander program + console.log capture + ANSI strip + exitCode capture/reset).
 - Every test must restore fetch and env in `finally`. Tests never hit the real network or launch a real browser (`open` command tests always pass `--print`).
 - When testing output, match on ANSI-stripped text. `label()` pads keys to 14 chars, so a 14-char key like `SWARMS_API_KEY` has **no** space before its value — use `\s*`, not `\s+`.
