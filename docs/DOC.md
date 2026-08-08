@@ -70,7 +70,7 @@ There are **no other** truly-global flags. Each subcommand declares its own opti
 
 ## 4. Environment variables
 
-All configuration is environment-driven. The CLI does not read or write any config file. Implementation lives in `src/lib/config.ts`.
+All configuration is environment-driven. At startup the CLI auto-loads `./.env` from the current working directory (`src/lib/env.ts`): only the allowlisted variables below are read from the file (`SWARMS_API_KEY`, `SWARMS_WALLET_PRIVATE_KEY`, `PRIVATE_KEY`, `SWARMS_NO_ANIM`, `NO_COLOR`), and a variable already set in the shell is never overridden. The CLI never writes any file. Env readers live in `src/lib/config.ts`.
 
 | Variable | Read by | Required? | Default | Behavior |
 | --- | --- | --- | --- | --- |
@@ -1093,6 +1093,7 @@ done
 | `src/lib/api.ts` | `post()` / `get()` + `ApiError` + `formatHttpError()`. |
 | `src/lib/config.ts` | `getApiKey()`, `getBaseUrl()`, `isAllowedSwarmsHost()`, `getWalletPrivateKey()`. Hardcoded `API_BASE = 'https://swarms.world'`. |
 | `src/lib/manifest.ts` | `loadManifest()` — file path or `-` for stdin. |
+| `src/lib/env.ts` | `loadEnvFile()` — allowlisted `./.env` auto-loader; `parseEnvFile()`, `isFromEnvFile()`. Shell env wins. |
 | `src/lib/open.ts` | `openInBrowser()` with scheme + shell-meta safety. |
 | `src/lib/prompt.ts` | `prompt()`, `promptSecret()` — readline + raw-mode masked input. |
 | `src/lib/theme.ts` | Brand palette, banner, mascot animation, helpers (`label`, `ok`, `fail`, `info`, `divider`, `bullet`, `section`, `footer`). |

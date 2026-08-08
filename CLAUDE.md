@@ -52,6 +52,7 @@ CI (`.github/workflows/test.yml`) runs exactly these on every push and PR across
 src/index.ts            commander wiring, custom help renderer, no-args welcome screen
 src/lib/api.ts          post()/get() + ApiError + formatHttpError; ALL network I/O goes through here
 src/lib/config.ts       env-var readers; hardcoded API_BASE; swarms.world host allowlist
+src/lib/env.ts          allowlisted ./.env auto-loader (shell env wins)
 src/lib/manifest.ts     JSON manifest loading (file path or "-" for stdin)
 src/lib/open.ts         browser launcher with URL-safety gate
 src/lib/prompt.ts       readline prompt + raw-mode masked secret input
@@ -82,7 +83,7 @@ docs/README.*.md        localized READMEs (zh-CN, ja, hi, de, pl, …)
 - **Sending the wallet private key to swarms.world is intentional** — the server signs transactions server-side by design. Do not flag it as a vulnerability or refactor it away.
 - **Never log, persist, or embed secrets in errors.** API key display is masked (first/last 4 chars). Wallet keys come only from `--private-key`, `$SWARMS_WALLET_PRIVATE_KEY`, `$PRIVATE_KEY`, or the hidden prompt, and live in memory only.
 - **Browser-launch safety**: any URL handed to `openInBrowser()` must be http(s) with no shell-meta (enforced in `src/lib/open.ts`); server-supplied listing URLs are additionally checked against the swarms.world host allowlist before opening. Preserve both gates.
-- **No config files, no telemetry.** All configuration is environment-driven; the CLI never reads or writes config files (`.env` included — `.env.example` is documentation, users must source it themselves).
+- **No config-file writes, no telemetry.** Configuration is environment-driven, plus one sanctioned read: `src/lib/env.ts` auto-loads `./.env` at startup with an ALLOWLIST (`SWARMS_API_KEY`, `SWARMS_WALLET_PRIVATE_KEY`, `PRIVATE_KEY`, `SWARMS_NO_ANIM`, `NO_COLOR`) and shell-wins precedence. Never widen the allowlist, load arbitrary keys, or write any file.
 
 ## Testing conventions
 
@@ -92,7 +93,7 @@ docs/README.*.md        localized READMEs (zh-CN, ja, hi, de, pl, …)
 - Put new tests where the neighboring coverage lives; don't port tests between suites without being asked. Both suites must stay green — if a CLI behavior changes, update the assertions in **both**.
 - `tests/helpers.ts` provides: `mockFetch()` (replaces `globalThis.fetch`, records url/method/headers/body), `forbidFetch()` (fails on any network call — use it for pre-network validation tests), `withEnv()` (scoped env mutation), `runCommand()` (fresh commander program + console.log capture + ANSI strip + exitCode capture/reset).
 - Every test must restore fetch and env in `finally`. Tests never hit the real network or launch a real browser (`open` command tests always pass `--print`).
-- When testing output, match on ANSI-stripped text. `label()` pads keys to 14 chars, so a 14-char key like `SWARMS_API_KEY` has **no** space before its value — use `\s*`, not `\s+`.
+- When testing output, match on ANSI-stripped text. `label()` pads keys to a fixed width (16); prefer `\s*` between a label key and its value so padding changes don't break assertions.
 - Assert auth-header behavior in both directions: Bearer present on authenticated calls, **absent** on wallet-signed calls.
 
 ## Code style
