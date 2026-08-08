@@ -129,7 +129,7 @@ export function divider(): string {
 }
 
 export function label(key: string, value: string): string {
-  return `  ${theme.textMuted(key.padEnd(14))}${theme.text(value)}`;
+  return `  ${theme.textMuted(key.padEnd(16))}${theme.text(value)}`;
 }
 
 export function bullet(msg: string): string {

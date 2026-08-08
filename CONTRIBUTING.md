@@ -69,7 +69,7 @@ Detailed file-by-file map lives in the [Project layout](./README.md#project-layo
 - **TypeScript strict mode.** `pnpm run typecheck` must pass.
 - **No new runtime dependencies** without a real justification in the PR description. Every dependency is a footprint on the install size and a future security-update obligation.
 - **No telemetry.** The CLI ships zero telemetry. Don't add any.
-- **Don't add config-file persistence.** All config is environment-driven by design — do not write a `~/.swarmsrc` reader without first opening an issue.
+- **Don't add config-file persistence.** All config is environment-driven by design. The one sanctioned file read is the allowlisted `./.env` auto-loader in `src/lib/env.ts` (shell env wins, documented keys only, never written). Do not write a `~/.swarmsrc` reader or extend the allowlist without first opening an issue.
 - **Don't introduce a base-URL override.** The host is hardcoded to `https://swarms.world` so a stray shell variable cannot redirect a Bearer key or wallet key elsewhere. This is a security property, not an oversight.
 - **Be careful with the wallet private key.** Never log it, never write it to disk, never include it in error messages. The only sanctioned paths are `--private-key`, `$SWARMS_WALLET_PRIVATE_KEY`, `$PRIVATE_KEY`, and the hidden-input prompt.
 - **Be careful with the API key.** Same rules. Mask it when displaying (first/last 4 chars), and never include it in error output.

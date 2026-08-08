@@ -1,4 +1,5 @@
 import { Command, Help } from 'commander';
+import { loadEnvFile } from './lib/env.js';
 import { animatedBanner, banner, footer, theme } from './lib/theme.js';
 import { registerLogin } from './commands/login.js';
 import { registerWhoami } from './commands/whoami.js';
@@ -75,6 +76,10 @@ class SwarmsHelp extends Help {
     return out.join(itemSep) + '\n';
   }
 }
+
+// Pick up allowlisted vars from ./.env before anything reads key state —
+// the banner attached below renders the masked key. Shell env always wins.
+loadEnvFile();
 
 const program = new Command();
 
